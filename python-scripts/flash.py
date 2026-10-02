@@ -80,6 +80,34 @@ WS_STATUS = {0: "OK", 1: "Unsupported command", 2: "Illegal state",
              5: "Invalid image size", 6: "More data needed",
              7: "Invalid app ID", 8: "Invalid version"}
 
+# EVERY BLUETOOTH STEP HAS A TIME LIMIT, because the failure it prevents is silence. A thermostat
+# that asks for a PIN refuses to let a computer subscribe to it, and on Linux the operating system
+# does not report that: it waits for somebody to type the PIN, and this tool waited with it --
+# measured at 17 minutes before it was killed, printing nothing. A step that has not finished in
+# STEP_LIMIT seconds stops the run and says what to do, and stopping at any step is safe (see
+# STALL_* below for why).
+STEP_LIMIT = 10.0
+
+
+class Stalled(Exception):
+    """A Bluetooth step that did not finish in time. The message is the whole advice to the owner."""
+
+
+STALL_PIN = ("the thermostat did not let this computer subscribe to it. It most likely asks for a "
+             "PIN: turn the PIN off in the thermostat's Bluetooth menu, then run this again. "
+             "Nothing was sent.")
+STALL_STM8 = ("the connection stalled during the thermostat's update. Its bootloader is never "
+              "overwritten by an update, so it still accepts one: run this again.")
+STALL_RADIO = ("the connection stalled during the radio's update. The radio only switches to a new "
+               "image after the final check, so it is still running its old one: run this again.")
+
+
+async def bounded(step, advice, limit=None):
+    try:
+        return await asyncio.wait_for(step, limit or STEP_LIMIT)
+    except asyncio.TimeoutError:
+        raise Stalled(advice) from None
+
 
 # ---------------------------------------------------------------- finding a device ----
 # A MAC DOES NOT IDENTIFY A DEVICE ON macOS. CoreBluetooth never exposes the hardware address; it
@@ -328,12 +356,12 @@ async def flash_thermostat(client, enc_path, logfile, dropped, retries=4):
 
     raw = binascii.unhexlify(open(enc_path).read().strip())
     chunks = parse_chunks(raw)
-    await client.start_notify(MCU_NOTIFY, on_notify)
+    await bounded(client.start_notify(MCU_NOTIFY, on_notify), STALL_PIN)
     await asyncio.sleep(1.0)
 
     log("START", f"{len(chunks)} chunks from {enc_path}")
     queue.clear()
-    await client.write_gatt_char(MCU_WRITE, bytes([0xA0]))   # enter update mode
+    await bounded(client.write_gatt_char(MCU_WRITE, bytes([0xA0])), STALL_STM8)   # enter update mode
     reply = await next_reply(25)
     if not reply or reply[0] != 0xA0:
         return done("ABORT_NO_FLASHMODE")
@@ -348,7 +376,8 @@ async def flash_thermostat(client, enc_path, logfile, dropped, retries=4):
             while off < len(chunk):
                 end = min(off + 14, len(chunk))
                 packet = chunk[off:end] + bytes(14 - (end - off))
-                await client.write_gatt_char(MCU_WRITE, bytes([0xA1, seq]) + packet)
+                await bounded(client.write_gatt_char(MCU_WRITE, bytes([0xA1, seq]) + packet),
+                              STALL_STM8)
                 off, seq = end, seq + 1
             reply = await next_reply(20)
             while reply is not None and not (reply[0] == 0xA1 and len(reply) > 1
@@ -422,14 +451,14 @@ async def flash_radio(client, bin_path):
     async def send(payload, timeout=10.0):
         arrived.clear()
         status[0] = None
-        await client.write_gatt_char(OTA_CONTROL, payload)
+        await bounded(client.write_gatt_char(OTA_CONTROL, payload), STALL_RADIO)
         try:
             await asyncio.wait_for(arrived.wait(), timeout)
         except asyncio.TimeoutError:
             return 255
         return status[0]
 
-    await client.start_notify(OTA_CONTROL, on_notify)
+    await bounded(client.start_notify(OTA_CONTROL, on_notify), STALL_PIN)
     await asyncio.sleep(1.0)
 
     s = await send(struct.pack("<BH", 1, len(data)))
@@ -444,7 +473,7 @@ async def flash_radio(client, bin_path):
     off, last_pct = 0, -1
     while off < len(data):
         end = min(off + 20, len(data))
-        await client.write_gatt_char(OTA_DATA, data[off:end], response=True)
+        await bounded(client.write_gatt_char(OTA_DATA, data[off:end], response=True), STALL_RADIO)
         off = end
         pct = off * 100 // len(data)
         if pct >= last_pct + 10:
@@ -453,11 +482,14 @@ async def flash_radio(client, bin_path):
 
     try:
         s = await send(struct.pack("<BI", 3, crc), timeout=30.0)
-        await client.stop_notify(OTA_CONTROL)
     except Exception as e:                                   # noqa: BLE001  a drop here is expected
         print(f"    the link dropped at the verify step ({type(e).__name__}) -- that is the radio "
               f"applying the image and restarting, which is the normal ending")
         return None
+    try:                                                     # the radio may already be restarting
+        await bounded(client.stop_notify(OTA_CONTROL), STALL_RADIO, limit=3.0)
+    except Exception:                                        # noqa: BLE001
+        pass
     if s == 0:
         return True
     print(f"    Failed: {WS_STATUS.get(s, f'unknown status {s}')}")
@@ -544,12 +576,15 @@ async def main():
 
         # Drop the thermostat's reply subscription before the radio transfer shares this link.
         try:
-            await client.stop_notify(MCU_NOTIFY)
+            await bounded(client.stop_notify(MCU_NOTIFY), STALL_RADIO, limit=3.0)
         except Exception:                                    # noqa: BLE001
             pass
 
         print(f"\n2/2 radio: {rel['radio']['file']}  ({rel['radio']['bytes']} bytes)  ~2 minutes")
         await flash_radio(client, radio_img)
+    except Stalled as e:
+        print(f"\nSTOPPED: {e}\nDetails: {log}")
+        return 1
     finally:
         # The radio reboots into its new image at the verify step, so the link is usually gone
         # already and this raises. That is the ordinary ending, not an error.

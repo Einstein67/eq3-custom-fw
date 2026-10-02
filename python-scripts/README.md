@@ -36,6 +36,10 @@ took the image, and stops without touching the radio if it did not.
 A few minutes is normal. **The connection dropping at the very end is success, not failure** — the
 radio applies its image and restarts, which kills the link it was being flashed over.
 
+**Turn the thermostat's PIN off first**, in its Bluetooth menu. A thermostat that asks for a PIN
+does not let this script in, and the script stops after ten seconds saying so. Any stop is safe to
+retry: a half-sent update leaves the thermostat's bootloader and the radio's old image in place.
+
 Afterwards the thermostat asks for the date and does nothing until it has one. Set it from the page,
 from eQ-3's own app, or from Home Assistant. That is normal.
 
