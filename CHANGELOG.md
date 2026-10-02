@@ -2,10 +2,13 @@
 
 ## 2.01 — this firmware
 
-Built on 2.00. The radio changes; the thermostat changes only the version number it reports.
+Built on 2.00. Both the radio and the thermostat change.
 
 - **Home Assistant no longer logs a warning for every broadcast.** The flags (window, lock, boost,
   battery low, mode) now go out in the order its decoder asks for. The values are the same.
+- **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline
+  and rechargeable cells alike. 2.00 moved it on a thermostat whose brown-out setting had been
+  changed, and could warn only moments before the batteries gave out.
 
 ---
 

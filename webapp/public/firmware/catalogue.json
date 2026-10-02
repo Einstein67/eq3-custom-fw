@@ -20,11 +20,11 @@
     {
       "version": "2.01",
       "mod": true,
-      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id.",
+      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id. The low-battery warning is back at 2.4 V on every thermostat.",
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,
-        "sha256": "8765d335e61bbc75985d4515fd7bf74abe8673875f363a69f142766d4434d739",
+        "sha256": "372855ffc42cbe73334e89e2045943e0bbce6fae7ede968888b4b6a24ea0510c",
         "expect": 201
       },
       "radio": {
