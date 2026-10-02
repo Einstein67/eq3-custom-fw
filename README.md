@@ -66,27 +66,29 @@ so that text reads the right way up:
 | 4 | radio TX | adapter **RX** |
 | 5 | VCC | **nothing** |
 
-115200 baud, 8N1. **Leave pins 1 and 5 unconnected** — the batteries power the board, and a second
-supply stops the recovery working, because it needs you to take the power away.
+115200 baud, 8N1. **Leave pins 1 and 5 unconnected** — the batteries power the board. An ST-Link on
+the SWIM header may stay connected.
 
 ```sh
 python3 python-scripts/ble_chip_via_uart.py dump -p /dev/ttyUSB0 -o backup.bin
 python3 python-scripts/ble_chip_via_uart.py recover -p /dev/ttyUSB0
 ```
 
-It will ask you to **pull a battery, wait two seconds, and put it back** — the chip's boot ROM
-listens only in a short window just after power arrives.
+Nothing needs doing at the thermostat while it connects — no battery pull, no power cycle.
 
 That puts a radio image that answers without pairing into the spare slot and points the chip at it.
-Power cycle, close the case, and `flash.py` takes it from there over Bluetooth as normal. The wire is
+Unplug the adapter, power cycle, close the case, and `flash.py` takes it from there over Bluetooth
+as normal. **Unplug the adapter first**: while it is attached the radio stays in its boot ROM and
+never starts an image. The wire is
 for getting Bluetooth back, not for living on.
 
-Two things the rescue image does that a normal one does not: it advertises **whatever the thermostat
-last said about Bluetooth**, so it comes back even when the radio was switched off, and it advertises
-**twice a second** instead of once, so it is quicker to find and quicker to connect to. Both are there
-for the same reason — this image exists to be reachable, and then to be replaced. Install a real
-version over it with `flash.py` as soon as it answers; that one goes back to respecting the setting
-and the normal rate.
+Three things the rescue image does that a normal one does not: it **never asks for a pairing PIN**,
+and the thermostat cannot switch one on in it; it advertises **whatever the thermostat last said
+about Bluetooth**, so it comes back even when the radio was switched off; and it advertises **twice a
+second** instead of once, so it is quicker to find and quicker to connect to. All three are there for
+the same reason — this image exists to be reachable, and then to be replaced. Install a real version
+over it with `flash.py` as soon as it answers; that one goes back to respecting the settings, the
+PIN included, and the normal rate.
 
 ## Two chips, one version
 

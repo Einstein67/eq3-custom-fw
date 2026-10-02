@@ -22,21 +22,21 @@ header marked **PRG2**. Hold it so its text reads the right way up; the pins are
     adapter TX   ->  pin 3        (you transmit, the radio receives)
     adapter RX   ->  pin 4        (the radio transmits, you receive)
 
-**Leave pins 1 and 5 alone.** The batteries power the board; feeding it a second supply means the
-next step cannot work, because you will not be able to take its power away.
+**Leave pins 1 and 5 alone.** The batteries power the board, and the adapter needs only the three
+wires above. An ST-Link on the thermostat's SWIM header may stay connected `[manually verified]`.
 
 The port runs at 115200 baud, 8N1. `-p` is the adapter's device name: `/dev/ttyUSB0` or
 `/dev/ttyACM0` on Linux, `/dev/cu.usbserial-*` on macOS, `COM3` on Windows.
 
-HOW IT CONNECTS: YOU PULL A BATTERY WHILE IT ASKS
-=================================================
-The boot ROM listens only in a short window just after power comes up, before the firmware starts.
-There is no way to ask for that window later, so every command here begins the same way: the script
-starts calling out, and **you take a battery out, wait about two seconds, and put it back**. It
-catches the chip on the way up and says so.
+HOW IT CONNECTS: NO BATTERY PULL
+================================
+Every command begins the same way: the script calls the chip's boot ROM until it answers, and says
+so. **Nothing needs doing at the device** -- no battery pull, no power cycle `[manually verified]`:
+on a radio that no longer advertised, the ROM answered within six seconds with the batteries in and
+an ST-Link attached, for a dump and then for `recover`.
 
-Once it is in, it stays in for the rest of that run -- so a command that does several things needs
-only the one battery pull. Starting the script again needs another.
+Once it is in, it stays in for the rest of that run, so a command that does several things
+connects once.
 
 THE REASON MOST PEOPLE ARE HERE
 ===============================
@@ -44,7 +44,11 @@ THE REASON MOST PEOPLE ARE HERE
 
     python3 ble_chip_via_uart.py dump    -p /dev/ttyUSB0 -o eeprom_backup.bin   # do this first
     python3 ble_chip_via_uart.py recover -p /dev/ttyUSB0
-    ... unplug the wires, put the batteries back, close the case ...
+    ... unplug the adapter, power-cycle the thermostat so the radio boots it, close the case ...
+
+**UNPLUG THE ADAPTER BEFORE THAT POWER CYCLE.** While it is on the wire the radio stays in its boot
+ROM and never starts an image `[manually verified]` -- a recovered radio then looks as dark as a
+broken one.
     python3 flash.py <device>                                                   # both chips, wireless
 
 `recover` puts a radio image that answers without pairing into the slot the chip is NOT running,
@@ -55,16 +59,16 @@ That image is built to be found: it advertises even if Bluetooth was switched of
 and twice a second instead of once. It is meant to be replaced -- run `flash.py` as soon as the radio
 answers, and the version it installs behaves normally again.
 
-**It is stock 1.48, not our 2.00, on purpose.** Our own firmware can demand a pairing PIN, and on a
-thermostat that never ran it, the radio has never been told the owner's choice and assumes the
-cautious one -- so it would come back refusing you. The stock image has no such feature to refuse
-with. `--release X` picks a different one if you know better; `-i FILE` uses a file of your own.
+**It is our own firmware, and it NEVER asks for a PIN -- nothing can switch that on** `[binary]`.
+Not what the radio has stored, not the thermostat, which states its PIN setting at every boot, and
+not a factory reset: the one routine that applies the PIN is built without it in this image. It also
+keeps advertising while something is connected -- a recovery that stops advertising the moment a host
+takes the link looks exactly like one that did not work. It reports version 0.0 so nothing mistakes it
+for a release. `--release X` picks a release instead; `-i FILE` uses a file of your own.
 
-**One thing it cannot undo.** If the thermostat chip is alive and set to demand a PIN, it tells the
-radio so at every boot, and the radio obeys. `recover` fixes the radio, not that instruction. Turn
-the PIN off from the thermostat's own Bluetooth settings page, or over Bluetooth once you are back
-in. If the thermostat is dead -- the usual reason for being here -- it says nothing and the rescue
-stands.
+The thermostat's PIN setting is still STORED while the rescue image runs, on purpose: the release
+`flash.py` installs next obeys it. Turn the PIN off on the thermostat's own Bluetooth settings page
+before that if you do not want to be asked for one.
 
 THE REST
 ========
@@ -107,6 +111,11 @@ DS1_OFFSET = 0x0580
 DS2_OFFSET = 0x8000
 
 CONFIG_DS_LOCATION = 0x2044d8  # RAM -- what the ROM actually booted from, this session
+
+# Said wherever a command ends by asking for a restart: with the adapter on the wire the radio stays
+# in its boot ROM and never starts an image, so it looks exactly as dark as before (header).
+UNPLUG_FIRST = ("UNPLUG THE USB-SERIAL ADAPTER FROM THE THERMOSTAT FIRST, then power-cycle it -- "
+                "with the adapter attached the radio stays in its boot ROM and never starts")
 
 # The write ceiling that actually matters: measured 64B OK / 96B TIMEOUT on this rig. Kept well
 # under it, and used for every write in this file (dump/read keep the 240B upstream default --
@@ -204,16 +213,14 @@ class HCITransport:
 
 
 def wait_for_rom(hci, timeout=60):
-    """Call the boot ROM until it answers. The person at the device has to take a battery out.
+    """Call the boot ROM until it answers. Nothing needs doing at the device (header).
 
-    IF IT NEVER ANSWERS AT ALL, check the wiring first -- swapped TX and RX look exactly like this,
-    and so does anything else feeding the board power, because then taking a battery out changes
-    nothing. Try a few more battery pulls too: the window is short and it is easy to miss.
+    IF IT NEVER ANSWERS AT ALL, check the wiring first -- swapped TX and RX look exactly like this.
 
     If it still never answers, the chip may be beyond this wire. The serial port it replies on is
     switched on by the firmware's own start-up, so firmware that crashes before it gets there leaves
     the port correctly wired and permanently silent. There is no other way in to this chip."""
-    print(">>> Pull battery, wait 2s, re-insert <<<")
+    print("calling the radio's boot ROM ...")
     hci.reset_input()
     start = time.time()
     last_print = 0
@@ -234,7 +241,7 @@ def wait_for_rom(hci, timeout=60):
         if elapsed - last_print >= 10:
             print(f"  Still waiting... ({elapsed:.0f}s)")
             last_print = elapsed
-    print("Timeout waiting for ROM bootloader.")
+    print("Timeout waiting for ROM bootloader. Check the wiring: TX to pin 3, RX to pin 4, GND to pin 2.")
     return False
 
 
@@ -500,7 +507,7 @@ def cmd_ds_select(args):
         if err:
             print(f"FAILED: {err}")
             return 1
-        print("Selector flipped and verified. Power cycle the device for it to take effect.")
+        print(f"Selector flipped and verified. For it to take effect: {UNPLUG_FIRST}")
         return 0
     finally:
         hci.close()
@@ -602,8 +609,8 @@ def staged(release=None, rescue=False):
         entry = json.load(open(os.path.join(FIRMWARE, "catalogue.json"))).get("rescue_radio")
         if not entry:
             sys.exit("no rescue image is staged in this folder -- pass one with -i.")
-        return ("the rescue image: stock 1.48, connectable without pairing, and advertising "
-                "twice a second whatever the thermostat last said about Bluetooth"), image(entry)
+        return ("the rescue image: our firmware with the pairing PIN taken out, advertising twice "
+                "a second whatever the thermostat last said about Bluetooth"), image(entry)
     rel = pick(load_catalogue(), release)
     return (f"{rel['version']} radio"
             + ("  (ours)" if rel.get("mod") else "  (stock eQ-3)")), image(rel["radio"])
@@ -693,7 +700,7 @@ def cmd_recover(args):
         hci.close()
 
     print("\nDone. Now:")
-    print("  1. disconnect the UART wires and power cycle the thermostat")
+    print(f"  1. {UNPLUG_FIRST}")
     print("  2. close the case")
     print("  3. python3 flash.py --list          # it should appear")
     print("  4. python3 flash.py <device>        # brings BOTH chips up to date")
@@ -774,7 +781,7 @@ def cmd_flash_fw(args):
         readback = read_eeprom_chunked(hci, ds_offset, len(fw_data), chunk=WRITE_CHUNK)
         if readback == fw_data:
             print("Verified OK! (byte-identical to the source file)")
-            print(f"Now run: ds-select --ds {args.ds}  (once you're satisfied), then power cycle.")
+            print(f"Now run: ds-select --ds {args.ds}  (once you're satisfied), then: {UNPLUG_FIRST}")
             return 0
         print("FINAL VERIFY MISMATCH -- do not select this DS yet.")
         return 1
@@ -839,7 +846,7 @@ def cmd_patch_mac(args):
 
     Patches the BD_ADDR in both SS1 and SS2 using single-byte writes
     (the same proven-safe write primitive as the 'patch' command).
-    Only one battery-pull is needed -- the minidriver stays loaded."""
+    One connection covers both writes -- the minidriver stays loaded."""
     mac_be = parse_mac(args.mac)
     if mac_be is None:
         print(f"Invalid MAC format: {args.mac}")

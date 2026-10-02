@@ -61,21 +61,22 @@ a USB-to-serial adapter on the board's **PRG2** header:
 | 5 | VCC | **nothing** |
 
 Hold the board so the `PRG2` text reads the right way up; pin 1 is then on the left. 115200 baud,
-8N1. **Do not wire pins 1 or 5** — the batteries power the board, and a second supply stops the next
-part working.
+8N1. **Do not wire pins 1 or 5** — the batteries power the board. An ST-Link on the SWIM header may
+stay connected.
 
 ```sh
 python3 ble_chip_via_uart.py dump    -p /dev/ttyUSB0 -o eeprom_backup.bin
 python3 ble_chip_via_uart.py recover -p /dev/ttyUSB0
 ```
 
-**It will ask you to pull a battery.** The chip's boot ROM listens only in a short window just after
-power arrives, so the script calls out while you take a battery out, wait about two seconds, and put
-it back. One pull covers the whole run.
+**Nothing needs doing at the thermostat while it connects** — no battery pull, no power cycle. The
+script calls the chip's boot ROM until it answers.
 
 `recover` writes into the slot the chip is *not* running and checks every byte before switching to
-it, so a write that fails halfway leaves the chip booting what it had. Then unplug the wires, close
-the case, and `flash.py <device>` finishes the job over Bluetooth as normal.
+it, so a write that fails halfway leaves the chip booting what it had. Then unplug the wires,
+power-cycle the thermostat so the radio boots the new image, close the case, and `flash.py <device>`
+finishes the job over Bluetooth as normal. **Unplug the adapter before that power cycle**: while it is
+attached the radio stays in its boot ROM and never starts an image, so it looks as dark as before.
 
 The image it installs is built to be found: it advertises twice a second, and it advertises even if
 Bluetooth was switched off on the thermostat. It is meant to be replaced — run `flash.py` as soon as
