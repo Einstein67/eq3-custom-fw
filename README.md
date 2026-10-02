@@ -22,6 +22,8 @@ Every eQ-3 firmware version is here too, so you can always put it back exactly a
 **[What's new →](CHANGELOG.md)**  ·  **[Bluetooth protocol →](PROTOCOL.md)** — everything a program
 needs to talk to a thermostat, if you want to build your own integration or app.
 
+**[Home Assistant forum post →](https://community.home-assistant.io/t/custom-firmware-for-the-eq-3-cc-rt-ble-bthome-broadcasts-50-more-battery/1025955)**
+
 ## If the page cannot help
 
 [`python-scripts/`](python-scripts/README.md) flashes the same firmware from a computer, and reaches

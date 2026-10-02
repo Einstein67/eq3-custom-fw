@@ -87,8 +87,7 @@ type Release = {
   /**
    * One owner-facing sentence about this version, written by `tools/stage_firmware.py`. Empty for a
    * release it has nothing to say about, which the picker treats as "say nothing" rather than
-   * leaving a gap. It is NOT the changelog — that lives in the repo and is written for a reader with
-   * a disassembler.
+   * leaving a gap. It is a summary; the picker links to the full changelog (`CHANGELOG_URL`).
    */
   note?: string
 }
@@ -130,6 +129,9 @@ const BYTES_PER_SEC = { stm8: 387, radio: 455 } as const
  * because of what the sheet is doing while it waits — see the call site.
  */
 const FETCH_MS = 30_000
+
+/** The full owner-facing changelog — every version this picker offers, eQ-3's own included. */
+const CHANGELOG_URL = 'https://github.com/dbuezas/eq3-custom-fw/blob/main/CHANGELOG.md'
 
 function seconds(rel: Release): number {
   return rel.stm8.bytes / BYTES_PER_SEC.stm8 + rel.radio.bytes / BYTES_PER_SEC.radio
@@ -662,12 +664,18 @@ function VersionChoice({
           ))}
         </SelectContent>
       </Select>
-      {rel.note && (
-        <div>
-          <p className="font-medium">Changelog</p>
-          <p className="mt-1 text-muted-foreground">{rel.note}</p>
-        </div>
-      )}
+      <div>
+        <p className="font-medium">Changelog</p>
+        {rel.note && <p className="mt-1 text-muted-foreground">{rel.note}</p>}
+        <a
+          href={CHANGELOG_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-block text-primary underline underline-offset-4"
+        >
+          Full changelog
+        </a>
+      </div>
     </div>
   )
 }

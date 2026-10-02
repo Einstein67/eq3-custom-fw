@@ -6,9 +6,10 @@ Built on 2.00. Both the radio and the thermostat change.
 
 - **The room, clock and valve screens show the same weekday, schedule bar and mode icons as the
   normal screen.** On 2.00 the weekday came and went depending on which screen had drawn last.
-- **Home Assistant or the app can no longer draw over the screen you are on.** A command arriving
-  during a settings menu, the valve adaptation or an error code still works and is answered, but the
-  normal screen only shows its result once you are back on it.
+- **A command from Home Assistant or the app no longer garbles a menu, the valve adaptation (`InS`,
+  `AdA`) or an error code (F1, F2, F3).** The thermostat used to redraw parts of its normal screen on
+  top of them, leaving a broken mix of both. The command still runs, and its result shows once you
+  are back on the normal screen.
 - **A thermostat showing an error code (F1, F2, F3) still answers Home Assistant and the app**, at
   no extra battery cost. It used to stop answering a second after the code appeared, so the error
   could only be seen at the radiator. Leaving the error still takes a BOOST press.
@@ -20,15 +21,16 @@ Built on 2.00. Both the radio and the thermostat change.
   and rechargeable cells alike. 2.00 moved it on a thermostat whose brown-out setting had been
   changed, and could warn only moments before the batteries gave out.
 - **A connected thermostat uses less battery and answers faster.** The radio now settles on one
-  rhythm for the whole connection instead of stepping through three, chosen by measuring every
-  Bluetooth adapter we have and an ESPHome proxy through Home Assistant: a single request is
+  rhythm for the whole connection instead of stepping through three, chosen by measuring it through
+  Home Assistant on a CSR8510, a Realtek RTL8761B, an Intel 8260/8265 (built in), a
+  Broadcom BCM20702 and an ESP32-C3 running as an ESPHome Bluetooth proxy: a single request is
   answered in well under a second, and a burst of 20 in a few seconds. When Home Assistant (or
   anything else) speeds the connection up, the radio asks for its rhythm back about a second after
   things go quiet. Firmware updates still run at full speed.
-- **Some Bluetooth adapters no longer keep the thermostat awake.** Certain adapters announce their
-  channel changes far in advance, and until the change the radio used to wake at every connection
-  event. It now keeps sleeping in between and wakes just before the change, which more than halves
-  the battery a held connection costs on such an adapter.
+- **A Broadcom BCM20702 adapter no longer keeps the thermostat awake.** It announces its channel
+  changes 20 to 30 seconds in advance, and until the change the radio used to wake at every
+  connection event. It now keeps sleeping in between and wakes just before the change, which more
+  than halves the battery a held connection costs on that adapter.
 - **A phone or hub that disappears mid-connection costs far less battery.** When the other side
   vanishes without saying goodbye, the radio searches for it until it gives up, and that search is
   expensive. It now gives up after 6 seconds instead of 30, which cuts that cost from about half an
