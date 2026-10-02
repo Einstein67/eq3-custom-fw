@@ -44,7 +44,7 @@ export type Settings = {
   /** Seconds between idle screens, 1–9. */
   screenSeconds: number
   /**
-   * LCD drive strength, stored and sent as PON+1, 1–8 — the display's CONTRAST.
+   * The display's CONTRAST — the LCD controller's CC field — stored and sent as CC+1, 1–8.
    *
    * Not brightness: the panel has no backlight, so this changes how dark a lit segment is against
    * the glass rather than how much light comes out of it `[owner]`.
@@ -217,11 +217,11 @@ export const setScreen = (mask: number, seconds: number) => [
 ]
 
 /**
- * `cmd 0x1A` — the LCD's CONTRAST (its drive strength), applied LIVE.
+ * `cmd 0x1A` — the LCD's CONTRAST, applied LIVE.
  *
  * That is why it exists as a command rather than being left to a memory write: stock programs the
- * LCD's drive register exactly once at boot, so a byte written into the cell shows nothing until
- * the next reboot. Stored as PON+1 (1–8), and **0 is a real argument** — it stores the unset
+ * LCD's control register exactly once at boot, so a byte written into the cell shows nothing until
+ * the next reboot. Stored as CC+1 (1–8), and **0 is a real argument** — it stores the unset
  * sentinel and puts the panel back to stock, so a contrast set over the air can be undone.
  */
 export const setContrast = (ponPlusOne: number) => [

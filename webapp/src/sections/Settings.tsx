@@ -740,7 +740,7 @@ function Unread() {
 
 /**
  * **CONTRAST, NOT BRIGHTNESS** `[owner]`. The panel has no backlight — nothing about it is bright or
- * dim. What this drives is the LCD's drive strength, which changes how DARK a lit segment is against
+ * dim. What this drives is the LCD's contrast control, which changes how DARK a lit segment is against
  * the glass, and "brightness" sent people looking for a lamp that does not exist.
  */
 function ContrastSheet({

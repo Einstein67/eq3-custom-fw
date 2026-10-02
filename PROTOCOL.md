@@ -436,7 +436,7 @@ untouched, so every constraint is the client's.
 | `0x14` | stock + 2.00 | `14 <temp×2> <duration÷5>` | Window-open temperature, and how many minutes it holds |
 | `0x0E` | 2.00 only | `0E <minutes> <valve%>` | Boost duration and how far the valve opens |
 | `0x15` | 2.00 only | `15 <mask> <seconds>` | What the idle screen shows, and how fast it rotates. See below |
-| `0x1A` | 2.00 only | `1A <1..8>` | Screen brightness, applied live. `0` restores the factory level |
+| `0x1A` | 2.00 only | `1A <1..8>` | Screen contrast, applied live. `0` restores the factory level |
 | `0xe0` | 2.00 only | `e0 <0\|1>` | Automatic window detection: `1` = the thermostat may decide for itself |
 | `0x17` | 2.00 only | `17 <0..3> <0\|1>` | How often the descaling run happens, and whether a flat battery holds it back. See below |
 | `0x16` | 2.00 only | `16` | **Read every setting above in one command.** See below |
@@ -490,7 +490,7 @@ exercises the pin thirteen times a year and drops about three quarters of the mi
 | 6 | boost valve opening, percent | `0x0E` arg 1 |
 | 7 | idle-screen mask | `0x15` arg 0 |
 | 8 | idle-screen rotation, seconds | `0x15` arg 1 |
-| 9 | screen brightness, 1–8 | `0x1A` |
+| 9 | screen contrast, 1–8 | `0x1A` |
 | 10 | window auto-detect, 1 = it may decide | `0xE0` |
 | 11 | descaling run, how often | `0x17` arg 0 |
 | 12 | descaling run, 1 = a flat battery holds it back | `0x17` arg 1 |
