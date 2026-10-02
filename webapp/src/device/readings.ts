@@ -127,6 +127,34 @@ export const BROADCAST_SETS: string[][] = [
 export const BROADCAST_FIELDS = BROADCAST_SETS.flat()
 
 /**
+ * `describeValues`, GROUPED BY THE ADVERT EACH VALUE ARRIVES IN — one array per object set, quiet
+ * values left out. Anything the table has no row for joins the last group, as in `describeSets`.
+ */
+export function describeValueSets(
+  values: Record<string, BthomeValue>,
+  ctx: ReadingContext = NOT_SELF,
+): Reading[][] {
+  const all = describeValues(values, ctx)
+  const groups = BROADCAST_SETS.map((keys) => all.filter((r) => keys.includes(r.key)))
+  groups[groups.length - 1]!.push(...all.filter((r) => !BROADCAST_FIELDS.includes(r.key)))
+  return groups
+}
+
+/**
+ * When each object set last arrived — the newest arrival time of any of its fields, or null when
+ * none has. Unknown objects date the last set, the group `describeValueSets` puts them in.
+ */
+export function setsHeardAt(valuesAt: Record<string, number>): (number | null)[] {
+  const newest = (keys: string[]) =>
+    keys.reduce<number | null>((t, k) => Math.max(t ?? -Infinity, valuesAt[k] ?? -Infinity), null)
+  const sets = BROADCAST_SETS.map(newest)
+  const unknown = newest(Object.keys(valuesAt).filter((k) => !BROADCAST_FIELDS.includes(k)))
+  const last = sets.length - 1
+  sets[last] = Math.max(sets[last] ?? -Infinity, unknown ?? -Infinity)
+  return sets.map((t) => (t === -Infinity ? null : t))
+}
+
+/**
  * One row per field this thermostat airs, whether or not it has arrived yet — `null` text where it
  * has not, for the caller to draw as a placeholder.
  *

@@ -31,7 +31,7 @@ import {
 } from '@/device/link'
 import { useChooseFor } from '@/device/useChooseFor'
 import { TEST_MODE } from '@/device/testMode'
-import { describeValues } from '@/device/readings'
+import { describeValueSets, setsHeardAt } from '@/device/readings'
 import { ageTint, signalTint } from '@/lib/tint'
 import { cn } from '@/lib/utils'
 import {
@@ -493,10 +493,27 @@ function PendingRow({
  * see the list's ticking clock.
  */
 function ago(at: number, now: number): string {
-  const s = Math.round((now - at) / 1000)
+  // An advert that lands between two ticks is newer than `now`; it is 0 s old, not -1.
+  const s = Math.max(0, Math.round((now - at) / 1000))
   if (s < 90) return `${s}s ago`
   const m = Math.round(s / 60)
   return m < 90 ? `${m} min ago` : `${Math.round(m / 60)} h ago`
+}
+
+/**
+ * One advert's age, as a badge like the readings beside it, tinted by how stale it is
+ * (`lib/tint.ts`). A dash for a set not heard yet.
+ */
+function Age({ at, now }: { at: number | null; now: number }) {
+  return (
+    <Badge
+      variant="outline"
+      className="font-normal tabular-nums text-muted-foreground"
+      style={at === null ? undefined : { color: ageTint(Math.max(0, now - at) / 1000) }}
+    >
+      {at === null ? '—' : ago(at, now)}
+    </Badge>
+  )
 }
 
 /** Which of a row's three sheets is open, and on which thermostat. One at a time, list-wide. */
@@ -528,7 +545,33 @@ function DeviceRow({
   // EVERYTHING THE BROADCAST CARRIES, AS BADGES, in the broadcast's own order and with nothing
   // lifted out `[owner]` — the target temperature included, beside the current one, so the pair is
   // read together. No reading is repeated anywhere else in the row.
-  const readings = describeValues(report.values, { self: state === 'connected' })
+  const groups = describeValueSets(report.values, { self: state === 'connected' })
+  const heardAt = setsHeardAt(report.valuesAt)
+  // FACTS ABOUT THIS BROWSER'S HOLD ON THE THERMOSTAT, not readings — they close the last line.
+  const statusBadges = (
+    <>
+      {/* THREE STATES, AND ONLY TWO OF THEM ARE FAULTS `[owner]`. What matters is whether the
+          BROADCAST is sealed: if it is and we cannot open it, the readings are unreachable and that
+          is worth red. If it is not, "no key" is a plain fact about a thermostat — most have none,
+          the readings arrive in the clear, nothing is wrong. */}
+      {report.encrypted && report.needsKey ? (
+        <Badge variant="outline" className="border-warn/40 font-normal text-warn">
+          {device.key ? 'wrong key' : 'missing key'}
+        </Badge>
+      ) : (
+        !device.key && (
+          <Badge variant="outline" className="font-normal text-muted-foreground">
+            no key
+          </Badge>
+        )
+      )}
+      {!device.deviceId && (
+        <Badge variant="outline" className="font-normal text-muted-foreground">
+          not granted to this page
+        </Badge>
+      )}
+    </>
+  )
 
   return (
     <li>
@@ -585,6 +628,18 @@ function DeviceRow({
 
                 It does NOT navigate. Tapping the row still opens the thermostat, and opening one
                 still connects it; this is the half of that which can be done from here. */}
+            {/* HOW WELL IT IS HEARD, LEFT OF THE BUTTON `[owner]`, so the row needs no line of
+                its own for it. TINTED, NOT JUST PRINTED `[owner]`: a person scanning the list reads
+                a colour before a figure. The ramp is in `lib/tint.ts`; the inline style is because
+                the colour is continuous and a class cannot be. */}
+            {report.rssi !== null && (
+              <span
+                className="shrink-0 text-xs tabular-nums"
+                style={{ color: signalTint(report.rssi) }}
+              >
+                {report.rssi} dBm
+              </span>
+            )}
             <LinkButton state={state} onClick={onLink} />
           </div>
 
@@ -592,88 +647,50 @@ function DeviceRow({
             variant="ghost"
             size="row"
             onClick={onOpen}
-            className="flex-col items-stretch pt-0"
+            className="flex-col items-stretch gap-1 pt-1.5"
           >
-            <div className="flex items-baseline justify-end gap-3">
-              {/* HOW WELL IT IS HEARD, BESIDE HOW LONG AGO `[owner]` — the two halves of the same
-                  question. A row that has gone quiet and a row that is merely far away look the
-                  same without the signal, and the answer to them is not the same. */}
-              <span className="flex shrink-0 items-baseline gap-2 text-xs font-normal text-muted-foreground">
-                {/* TINTED, NOT JUST PRINTED `[owner]`. Both numbers answer "is it really there",
-                    and a person scanning a list of thermostats reads a colour before they read a
-                    figure — the number stays for whoever wants the detail. The ramp and its
-                    thresholds are in `lib/tint.ts`; the inline style is because the colour is
-                    continuous and a class cannot be. */}
-                {report.rssi !== null && (
-                  <span className="tabular-nums" style={{ color: signalTint(report.rssi) }}>
-                    {report.rssi} dBm
-                  </span>
-                )}
-                {report.lastAt !== null ? (
-                  <span
-                    className="tabular-nums"
-                    style={{ color: ageTint((now - report.lastAt) / 1000) }}
-                  >
-                    {ago(report.lastAt, now)}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
+            {/* ONE LINE PER ADVERT, EACH WITH ITS OWN AGE `[owner]`. The thermostat alternates two
+                object sets about a second apart, so a single age dates the newer half and says
+                nothing about the other; one line per set says which half went quiet. A set not
+                heard yet shows a dash for its age, not a missing line, so the row does not grow as
+                it fills.
+
+                With no readings in the broadcast at all — never heard, or heard with BThome
+                switched off — there are no sets to date, so one line says which, with the age of
+                the last advert. Switched off is a state, not a gap: the thermostat still
+                advertises and is still connectable. */}
+            {report.lastAt === null || !report.sensorData ? (
+              <div className="flex flex-wrap items-center gap-1">
+                {report.lastAt === null ? (
+                  <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
                     <Radio className="size-3" /> nothing heard yet
                   </span>
+                ) : (
+                  <>
+                    <Age at={report.lastAt} now={now} />
+                    <Badge variant="outline" className="font-normal text-muted-foreground">
+                      broadcast off
+                    </Badge>
+                  </>
                 )}
-              </span>
-            </div>
-
-            {/* EACH READING IS A BADGE `[owner]`. Run together as text they read as one sentence
-                and it is not obvious where one property ends and the next begins — which matters
-                most here, where every value is two words long. */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
-              {readings.map((r) => (
-                <Badge key={r.key} variant="secondary" className="gap-1 font-normal">
-                  <span className="text-muted-foreground">{r.label}</span>
-                  <span className="font-medium tabular-nums">{r.text}</span>
-                </Badge>
-              ))}
-              {/* HEARD, AND SAYING NOTHING — which is a state, not a gap. With the BThome broadcast
-                  switched off the thermostat still advertises and is still connectable, it just
-                  carries no readings, so the row goes blank while the age beside it keeps counting.
-                  Without this line that reads as an app that stopped working. */}
-              {report.count > 0 && !report.sensorData && (
-                <Badge variant="outline" className="font-normal text-muted-foreground">
-                  broadcast off
-                </Badge>
-              )}
-              {/* THE TWO OBJECT SETS ALTERNATE, so half of these are legitimately absent for the
-                  first second after a watch starts. Saying so stops a half-filled row reading as a
-                  thermostat that only sends half its readings. It is gated on there being a
-                  broadcast at all: with none, no second half is coming and the badge above is the
-                  true one. */}
-              {report.count > 0 && report.sensorData && report.setsSeen < 2 && (
-                <Badge variant="outline" className="font-normal text-muted-foreground">
-                  waiting for the other half
-                </Badge>
-              )}
-              {/* THREE STATES, AND ONLY TWO OF THEM ARE FAULTS `[owner]`. What matters is whether
-                  the BROADCAST is sealed: if it is and we cannot open it, the readings are
-                  unreachable and that is worth red. If it is not, "no key" is a plain fact about a
-                  thermostat — most have none, the readings arrive in the clear, nothing is wrong. */}
-              {report.encrypted && report.needsKey ? (
-                <Badge variant="outline" className="border-warn/40 font-normal text-warn">
-                  {device.key ? 'wrong key' : 'missing key'}
-                </Badge>
-              ) : (
-                !device.key && (
-                  <Badge variant="outline" className="font-normal text-muted-foreground">
-                    no key
-                  </Badge>
-                )
-              )}
-              {!device.deviceId && (
-                <Badge variant="outline" className="font-normal text-muted-foreground">
-                  not granted to this page
-                </Badge>
-              )}
-            </div>
+                {statusBadges}
+              </div>
+            ) : (
+              groups.map((rows, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-1">
+                  <Age at={heardAt[i] ?? null} now={now} />
+                  {/* EACH READING IS A BADGE `[owner]`. Run together as text they read as one
+                      sentence and it is not obvious where one property ends and the next begins. */}
+                  {rows.map((r) => (
+                    <Badge key={r.key} variant="secondary" className="gap-1 font-normal">
+                      <span className="text-muted-foreground">{r.label}</span>
+                      <span className="font-medium tabular-nums">{r.text}</span>
+                    </Badge>
+                  ))}
+                  {i === groups.length - 1 && statusBadges}
+                </div>
+              ))
+            )}
           </Button>
       </>
 

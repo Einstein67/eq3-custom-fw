@@ -9,7 +9,14 @@ import { expect, test } from 'bun:test'
 
 import type { BthomeValue } from './bthome.js'
 import { decodeObjects } from './bthome.js'
-import { BROADCAST_FIELDS, describeAll, describeSets, describeValues } from './readings'
+import {
+  BROADCAST_FIELDS,
+  describeAll,
+  describeSets,
+  describeValueSets,
+  describeValues,
+  setsHeardAt,
+} from './readings'
 
 const bytes = (s: string) => new Uint8Array(s.match(/../g)!.map((h) => parseInt(h, 16)))
 
@@ -82,6 +89,17 @@ test('an object with no row in the table is still shown, under its wire name', (
     { key: 'temperature', label: 'current', text: '21.0°' },
     { key: 'something new', label: 'something new', text: '7' },
   ])
+})
+
+test('the compact rows split by advert, and each advert is dated by its own fields', () => {
+  const values = { temperature: 21, window: false, battery_low: false, 'something new': 7 }
+  const keys = describeValueSets(values).map((g) => g.map((r) => r.key))
+  // battery_low false is quiet; the unknown object joins the last group.
+  expect(keys).toEqual([['temperature'], ['window', 'something new']])
+
+  expect(setsHeardAt({})).toEqual([null, null])
+  expect(setsHeardAt({ temperature: 5, voltage: 9 })).toEqual([9, null])
+  expect(setsHeardAt({ temperature: 5, window: 3, 'something new': 8 })).toEqual([5, 8])
 })
 
 test('connected says who holds the link: no / yes (not you) / yes (you)', () => {
