@@ -24,6 +24,9 @@ Built on 2.00. Both the radio and the thermostat change.
   vanishes without saying goodbye, the radio searches for it until it gives up, and that search is
   expensive. It now gives up after 6 seconds instead of 30, which cuts that cost from about half an
   hour of standby battery to under two minutes.
+- **The broadcast interval you picked survives a radio update.** The radio used to forget it and fall
+  back to about one second until the thermostat itself restarted, which could take weeks; it now
+  remembers the choice and puts it back when it starts.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 

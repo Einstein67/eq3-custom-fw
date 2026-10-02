@@ -641,7 +641,9 @@ one you pick.
 
 Both firmware halves are needed. With a stock radio the command never reaches the thermostat chip at
 all, so nothing answers — the radio is what carries a 2.00 command id across, and it is also what
-applies the interval.
+applies the interval. From 2.01 the radio also remembers the last choice itself, so the setting
+survives a radio update or restart on its own; a 2.00 radio falls back to about one second until the
+thermostat chip next restarts.
 
 **`cmd 0x1E` is packed BCD, most significant pair first**, so `1E 12 34 56` means the PIN 123456.
 Every nibble must be a decimal digit or the whole command is refused. **All zeros means "forget the
