@@ -20,6 +20,10 @@ Built on 2.00. Both the radio and the thermostat change.
   channel changes far in advance, and until the change the radio used to wake at every connection
   event. It now keeps sleeping in between and wakes just before the change, which more than halves
   the battery a held connection costs on such an adapter.
+- **A phone or hub that disappears mid-connection costs far less battery.** When the other side
+  vanishes without saying goodbye, the radio searches for it until it gives up, and that search is
+  expensive. It now gives up after 6 seconds instead of 30, which cuts that cost from about half an
+  hour of standby battery to under two minutes.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 

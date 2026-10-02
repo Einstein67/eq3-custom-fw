@@ -30,7 +30,7 @@
       "radio": {
         "file": "radio-2.01.bin",
         "bytes": 27552,
-        "sha256": "baf5f1e5bfa62045f762f3ab286ed244189427af8a916940cd7f19150d758cc9",
+        "sha256": "b670adbeb05a976f36d5244e2d850dbb353626f21778a5d7617169c4d65439e7",
         "expect": "5.1"
       }
     },
