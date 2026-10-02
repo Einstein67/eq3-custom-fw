@@ -12,7 +12,7 @@
  * enough to look broken. Everything below is therefore keyed on `BluetoothDevice.id`.
  *
  * ================================================================================================
- * FOUR TRAPS, EVERY ONE A SILENT FAILURE
+ * FIVE TRAPS, EVERY ONE A SILENT FAILURE
  * ================================================================================================
  * 1. `0xFCD2` must be in `requestDevice`'s `optionalServices` or the service data arrives as an
  *    EMPTY MAP with no error at all — the browser filters service data by per-device permission.
@@ -23,13 +23,18 @@
  * 3. Service data cannot be filtered on, and a BThome advert carries no Service UUIDs AD type, so
  *    the device must be matched by NAME — never `filters: [{ services: [0xfcd2] }]`.
  * 4. macOS delivers nothing unless Chrome has Bluetooth in Privacy & Security.
+ * 5. Chrome on a PHONE can stop seeing Bluetooth devices altogether until Chrome is restarted
+ *    `[manually verified]`: no broadcasts on a saved row AND a chooser that finds nothing, which reads
+ *    as a thermostat gone off the air. It was not — the same one was airing at −57 dBm a metre away
+ *    and taking a connection from a laptop at that moment. Any non-phone client tells the two apart,
+ *    and the fix is restarting Chrome, not touching the device. Cause unknown.
  *
  * AND IT IS FLAG-ONLY EVERYWHERE. `watchAdvertisements()` is experimental in Blink and Chrome marked
  * it "No longer pursuing" in 2023 `[external]`. So this is an enthusiast path: feature-detect and SAY
  * WHAT TO ENABLE rather than failing silently — `ENABLE_HINT` is that sentence.
  *
- * **How many devices one browser can watch before delivery degrades is NOT established.** It is
- * per-device by construction and nothing here serialises, but it has not been measured past one.
+ * **Four watched thermostats deliver fine in one browser** `[owner]`. It is per-device by
+ * construction and nothing here serialises; where it would start to degrade has not been measured.
  */
 import {
   decodeObjects,
