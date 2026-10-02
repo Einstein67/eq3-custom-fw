@@ -289,8 +289,15 @@ reply already carries the new state and you never need to follow up with a read.
 
 **But the push is not a guarantee, and a client must not wait for one.** It comes from the
 thermostat's periodic work, which does not run while the clock is unset or while a fault screen is
-up. A thermostat in either state answers commands perfectly and pushes nothing at all. Measured: a
-connection held for 15 seconds against a unit with no clock set received zero notifications.
+up. A thermostat in either state answers commands and pushes nothing at all. Measured: a
+connection held for 15 seconds against a unit with no clock set received zero notifications. (A
+fault screen — F1, F2, F3 — answers on 2.01 and later. On 2.00 it stops answering about a second
+after the code appears, until somebody presses BOOST.)
+
+**A command does not change the screen the thermostat is on, unless that is its normal screen.**
+Taken during a settings menu, the valve adaptation (`InS`, `AdA`) or a fault screen, it is applied
+and answered as usual, and the normal screen shows the result once the thermostat is back on it
+(2.01 and later).
 
 **The room temperature is not in the status reply.** Only the target is. The measured room
 temperature reaches a client through the broadcast and nowhere else on this channel.
@@ -957,7 +964,7 @@ checklist.
 | A 2.00 reply read as a version | Both start `01` and both are 15 bytes. Check the two zero bytes |
 | `Invalid Handle` on the encrypted channel | Wrong encryption key, or none stored. Not a missing characteristic |
 | A firmware update crawls, or dies part way, on an encrypted connection | Its packets were encrypted. Send them on the ordinary characteristic — a 16-byte packet does not fit in one encrypted write, and splitting each into three breaks the timing the update depends on |
-| No status pushes at all | The clock is unset or a fault screen is up. Commands still work |
+| No status pushes at all | The clock is unset or a fault screen is up. Commands still work (on a fault screen, from 2.01) |
 | A command ran on the wrong bytes | A short write was padded from the previous command's buffer. Send every argument |
 | The renamed device still airs the old name | Renaming reaches the air only after you disconnect |
 | Nothing answers on a Saturday at noon | The weekly descaling run — it drives the valve pin its full travel so limescale cannot seize it — holds the thermostat for about a minute and the receive path is not serviced. Commands are not answered; the radio keeps advertising, so it looks wedged. Re-send |
