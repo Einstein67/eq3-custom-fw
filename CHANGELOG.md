@@ -6,6 +6,9 @@ Built on 2.00. Both the radio and the thermostat change.
 
 - **The room, clock and valve screens show the same weekday, schedule bar and mode icons as the
   normal screen.** On 2.00 the weekday came and went depending on which screen had drawn last.
+- **Home Assistant or the app can no longer draw over the screen you are on.** A command arriving
+  during a settings menu, the valve adaptation or an error code still works and is answered, but the
+  normal screen only shows its result once you are back on it.
 - **Home Assistant no longer logs a warning for every broadcast.** The flags (window, lock, boost,
   battery low, mode) now go out in the order its decoder asks for. The values are the same.
 - **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline

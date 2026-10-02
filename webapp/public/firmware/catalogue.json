@@ -24,7 +24,7 @@
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,
-        "sha256": "6dae46446311a0cda3594ba408120e7649d5495b248935a874372553639ddfc5",
+        "sha256": "d9930b478c7984dc88058b35297604282946851cdd32b136d498ffb6abffd4e4",
         "expect": 201
       },
       "radio": {
