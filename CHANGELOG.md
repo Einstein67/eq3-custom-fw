@@ -12,7 +12,8 @@ Built on 2.00. Both the radio and the thermostat change.
 - **A thermostat that Home Assistant keeps connected uses less battery.** Home Assistant speeds
   the connection up to its fastest rhythm whenever it connects, and one integration does that on
   every poll. The radio now asks for its slow, power-saving rhythm back three seconds later, where
-  it used to stay fast for half a minute or, after a connect, for good.
+  it used to stay fast for half a minute or, after a connect, for good. It also checks which rhythm
+  is actually running, so a request the phone or computer did not apply is asked for again.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 
