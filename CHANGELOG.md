@@ -9,6 +9,8 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline
   and rechargeable cells alike. 2.00 moved it on a thermostat whose brown-out setting had been
   changed, and could warn only moments before the batteries gave out.
+- All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
+  bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 
 ---
 

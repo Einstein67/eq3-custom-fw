@@ -20,7 +20,7 @@
     {
       "version": "2.01",
       "mod": true,
-      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id. The low-battery warning is back at 2.4 V on every thermostat.",
+      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id. The low-battery warning is back at 2.4 V on every thermostat. All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44 bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.",
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,
@@ -29,8 +29,8 @@
       },
       "radio": {
         "file": "radio-2.01.bin",
-        "bytes": 27104,
-        "sha256": "87fc4eb85e6b599e21b06e2504702abee74668e0707a1c0a4e437875bf8d1a12",
+        "bytes": 27072,
+        "sha256": "1dc0e5ba98932aecad23a9044f98bdee1392e56d42920550408784afb151d1bd",
         "expect": "5.1"
       }
     },
