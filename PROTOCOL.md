@@ -490,6 +490,10 @@ client that rebuilds the mask from the four screen bits alone silently switches 
 daylight saving is on, it moves its own clock at the European boundary — which is what your local
 time does too, so there is no second adjustment to make.
 
+**A client that sends `0x03` with every poll restarts a thermostat on its own after a battery change**:
+the first poll sets the date, which is all a freshly powered thermostat waits for. That is intended —
+it is how an installed head comes back without anyone touching it.
+
 **It validates nothing, and the host must.** Bad fields are not cosmetic:
 
 - **A month above 12 is accepted and is durable.** The clock tidies the other fields within a minute
