@@ -1321,6 +1321,22 @@ async function openLink(id: string, stop: { asked: boolean }): Promise<boolean> 
         }
         return true
       } catch (e) {
+        // **ONE FAILED PASS IS NOT THE ANSWER — the window is** `[owner]`. A heard thermostat whose
+        // first connect fails is ordinary on a phone: Android's stack refuses a first attempt it
+        // then takes on the next pass, so giving up on the first throw told the owner "could not
+        // open" with most of the window unspent. A half-opened link is hung up before the next
+        // pass, so a later pass starts clean — `open` tears down any link it finds, but a failure
+        // on the LAST pass would otherwise leave one connected under a "could not open" dialog.
+        const half = links.get(d.id)
+        if (half) {
+          d.gatt?.disconnect()
+          tearDown(half)
+        }
+        if (!stop.asked && Date.now() < until) {
+          setState({ id, device: null }, 'waiting')
+          await new Promise((r) => setTimeout(r, OPEN_GAP_MS))
+          continue
+        }
         setState({ id, device: d }, 'disconnected')
         log(`${name()}: could not open it — ${why(e)}`)
         return false
