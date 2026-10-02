@@ -68,6 +68,10 @@ Built on 2.00. Both the radio and the thermostat change.
   connection at a time, most often held by Home Assistant. When a connect fails, the app says for
   certain whether something else holds it or the attempt simply failed. With a 2.00 radio, which does
   not broadcast this, the app and `flash.py` still say "probably held by something else".
+- **Two thermostats that report the same serial stay two entries in the list.** A thermostat flashed
+  by wire with another unit's image takes on that unit's serial; the app used to treat both as one,
+  each connection overwriting the other's name and key. It now tells them apart by the radio's own
+  address.
 - **The firmware list marks every release of this firmware**, and shows which one is installed.
 - **On a Mac, a thermostat still on eQ-3's original radio** gets the message that applies to it,
   instead of being told to pair.

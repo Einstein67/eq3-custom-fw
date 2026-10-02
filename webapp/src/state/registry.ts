@@ -16,9 +16,10 @@
  * command and answers on both, so it is the identifier every thermostat has.
  *
  * **`id` IS STICKY, and that is what makes an upgrade seamless.** `upsert` finds an existing row by
- * EITHER identifier and keeps the `id` it already had, so a thermostat added while stock — keyed by
- * serial — keeps its row, its name and its key when our firmware starts reporting a MAC as well.
- * Without that it would appear twice, and the second one would be the empty one.
+ * either identifier (`findThermostat` has the order, and why the MAC beats the serial) and keeps the
+ * `id` it already had, so a thermostat added while stock — keyed by serial — keeps its row, its name
+ * and its key when our firmware starts reporting a MAC as well. Without that it would appear twice,
+ * and the second one would be the empty one.
  *
  * The MAC is still stored whenever it is known, because things other than identity need it: the
  * BThome nonce is built from it, and it is what a person recognises.
@@ -273,6 +274,32 @@ const jotai = getDefaultStore()
 const state = () => jotai.get(registryAtom)
 const commit = (next: Registry) => jotai.set(registryAtom, next)
 
+/**
+ * The stored row that IS the thermostat that just said who it is, or none. Normalised inputs.
+ *
+ * **TWO THERMOSTATS CAN REPORT ONE SERIAL** `[manually verified]`: the serial lives in the STM8's
+ * bootloader page, and a full SWIM image carries the serial of the unit it was dumped from. A bench
+ * unit flashed that way answered with a radiator head's serial, and matching on the serial alone
+ * filed both under one row — each connection then overwrote the other's name, key and state. So the
+ * serial is the weakest of the three answers, and only decides when nothing better is known:
+ *
+ * 1. **The row holding this browser handle, if any row does.** `deviceId` is not an identity across
+ *    origins (the header), but on THIS origin one handle is one physical device — and it is what a
+ *    serial-only report (`fileRow`'s second caller) has to tell two clones apart with. Searched
+ *    across ALL rows first: checked row by row, an earlier clone matches on its serial before the
+ *    row with the handle is reached.
+ * 2. **Else, when both sides know a MAC, the MAC decides**, whatever the serials say. The radio
+ *    reports its own MAC, and no image carries one unit's MAC to another.
+ * 3. **Else the serial decides** — a stock thermostat has nothing else, and a row filed while stock
+ *    has no MAC yet, which is the upgrade the header describes.
+ */
+const findThermostat = (
+  devices: Thermostat[],
+  { mac, serial, deviceId }: { mac?: string | null; serial?: string | null; deviceId?: string | null },
+) =>
+  (deviceId ? devices.find((d) => d.deviceId === deviceId) : undefined) ??
+  devices.find((d) => (mac && d.mac ? d.mac === mac : !!serial && d.serial === serial))
+
 export const registry = {
   all: state,
   list: () => state().devices,
@@ -281,21 +308,21 @@ export const registry = {
   byDeviceId: (id: string) => state().devices.find((d) => d.deviceId === id) ?? null,
 
   /**
-   * The row for a thermostat that has just said who it is — matched on EITHER identifier.
+   * The row for a thermostat that has just said who it is — matched by `findThermostat`.
    *
    * It is `upsert`'s own matching, exposed, because a caller that is about to upsert usually needs
    * to read the row first: whether a key is already stored decides whether an offered one is used,
    * and whether the name is the owner's or the advertised default. Doing that with `get` would mean
    * guessing which identifier the row was keyed by, which is the guess this pair exists to remove.
    */
-  match: ({ mac, serial }: { mac?: string | null; serial?: string | null }) => {
+  match: ({ mac, serial, deviceId }: { mac?: string | null; serial?: string | null; deviceId?: string | null }) => {
     const m = mac ? normMac(mac) : null
     const s = serial?.trim() || null
-    return state().devices.find((d) => (!!s && d.serial === s) || (!!m && d.mac === m)) ?? null
+    return findThermostat(state().devices, { mac: m, serial: s, deviceId }) ?? null
   },
 
   /**
-   * Merge a patch into a row, or file a new one. Matched on EITHER identifier, and the `id` never
+   * Merge a patch into a row, or file a new one. Matched by `id` or `findThermostat`, and the `id` never
    * moves — see the header for why an upgraded thermostat must not get a second row.
    *
    * **PASS ONLY WHAT YOU ARE CHANGING.** Every field is optional except an identifier, so a caller
@@ -308,17 +335,19 @@ export const registry = {
     const s = state()
     const mac = patch.mac ? normMac(patch.mac) : undefined
     const serial = patch.serial?.trim() || undefined
-    const had = s.devices.find(
-      (d) =>
-        (patch.id && d.id === normId(patch.id)) ||
-        (!!serial && d.serial === serial) ||
-        (!!mac && d.mac === mac),
-    )
+    const had =
+      (patch.id ? s.devices.find((d) => d.id === normId(patch.id!)) : undefined) ??
+      findThermostat(s.devices, { mac, serial, deviceId: patch.deviceId })
     // NEW ROWS PREFER THE SERIAL, because it is the identifier BOTH firmwares report — so a row
     // filed today survives the thermostat being upgraded or reverted. An existing row keeps whatever
-    // it was first given, whether or not that is what a new row would pick.
-    const id = had?.id ?? normId(patch.id ?? serial ?? mac ?? '')
-    if (!id) throw new Error('a thermostat row needs a serial, a MAC or an explicit id')
+    // it was first given, whether or not that is what a new row would pick. A serial already taken by
+    // ANOTHER thermostat (a clone, `findThermostat`) cannot be this one's id, so it gets its MAC.
+    const taken = (v: string) => s.devices.some((d) => d.id === v)
+    const id =
+      had?.id ??
+      [patch.id, serial, mac].map((v) => (v ? normId(v) : '')).find((v) => v && !taken(v)) ??
+      ''
+    if (!id) throw new Error('a thermostat row needs a serial, a MAC or an explicit id that no other row has')
     const row: Thermostat = {
       addedAt: had?.addedAt ?? Date.now(),
       ...had,

@@ -89,6 +89,40 @@ test('a row that predates the serial keeps its MAC as its id', () => {
   expect(after.serial).toBe('OEQ0000001')
 })
 
+test('TWO THERMOSTATS WITH ONE SERIAL stay two rows when their MACs differ', () => {
+  // A full SWIM image carries the serial of the unit it was dumped from, so a bench unit flashed
+  // that way reported a radiator head's serial. Matched on the serial, the two shared one row and
+  // each connection overwrote the other's name and key.
+  const r = fresh()
+  const living = r.upsert({ serial: 'PEQ0805087', mac: '00:1a:22:00:00:01', name: 'Living', key: KEY, deviceId: 'h-living' })
+  const dev4 = r.upsert({ serial: 'PEQ0805087', mac: '00:1a:22:00:00:02', name: 'Dev4', deviceId: 'h-dev4' })
+
+  expect(r.list()).toHaveLength(2)
+  expect(living.id).toBe('PEQ0805087')
+  expect(dev4.id).toBe('00:1a:22:00:00:02') // the serial is taken, so the clone is keyed by its MAC
+  expect(dev4.key).toBeUndefined() // nothing of the other thermostat's leaked into this one
+  expect(r.get('PEQ0805087')?.name).toBe('Living')
+  expect(r.get('PEQ0805087')?.key).toBe(KEY)
+
+  // Reconnecting either one lands on its own row, by MAC, whatever the serial says.
+  r.upsert({ serial: 'PEQ0805087', mac: '00:1a:22:00:00:02', name: 'Dev4 renamed' })
+  expect(r.get('PEQ0805087')?.name).toBe('Living')
+  expect(r.get('00:1a:22:00:00:02')?.name).toBe('Dev4 renamed')
+})
+
+test('a serial-only report from a clone lands on the row with ITS handle', () => {
+  // `fileRow`'s second caller knows the serial and the handle but not the MAC; the serial alone
+  // would pick whichever clone was filed first.
+  const r = fresh()
+  r.upsert({ serial: 'PEQ0805087', mac: '00:1a:22:00:00:01', name: 'Living', deviceId: 'h-living' })
+  r.upsert({ serial: 'PEQ0805087', mac: '00:1a:22:00:00:02', name: 'Dev4', deviceId: 'h-dev4' })
+
+  expect(r.match({ serial: 'PEQ0805087', deviceId: 'h-dev4' })?.name).toBe('Dev4')
+  r.upsert({ serial: 'PEQ0805087', deviceId: 'h-dev4', name: 'Dev4 again' })
+  expect(r.get('00:1a:22:00:00:02')?.name).toBe('Dev4 again')
+  expect(r.get('PEQ0805087')?.name).toBe('Living')
+})
+
 test('a MAC is stored in one spelling however it is written', () => {
   expect(normMac('00:1A:22:AA:BB:CC')).toBe('00:1a:22:aa:bb:cc')
   expect(normMac('001a22aabbcc')).toBe('00:1a:22:aa:bb:cc')

@@ -2854,7 +2854,7 @@ function fileRow(d: BluetoothDevice, { mac, serial }: { mac?: string | null; ser
   // THIS IS ALSO WHERE A THERMOSTAT JOINS THE REGISTRY, and where an imported row is matched to
   // this origin's handle: both are the same upsert, because the identity is the device's own and the
   // handle is the thing the file could not carry. A row that was already here keeps its name and key.
-  const had = registry.match({ mac, serial })
+  const had = registry.match({ mac, serial, deviceId: d.id })
   registry.upsert({
     ...(mac ? { mac } : {}),
     ...(serial ? { serial } : {}),
