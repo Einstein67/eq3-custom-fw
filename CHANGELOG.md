@@ -49,8 +49,10 @@ Built on 2.00. Both the radio and the thermostat change.
   from a 2.01 radio.
 - **A connect that fails is retried** for the whole time the app is looking for the thermostat,
   instead of giving up after the first refusal.
-- **A thermostat the app can hear but not open is probably held by something else**, most often Home
-  Assistant: it takes one connection at a time. The app and `flash.py` now say so.
+- **The thermostat list shows who is connected: no, yes (you) or yes (not you).** It takes one
+  connection at a time, most often held by Home Assistant. When a connect fails, the app says for
+  certain whether something else holds it or the attempt simply failed. With a 2.00 radio, which does
+  not broadcast this, the app and `flash.py` still say "probably held by something else".
 - **The firmware list marks every release of this firmware**, and shows which one is installed.
 - **On a Mac, a thermostat still on eQ-3's original radio** gets the message that applies to it,
   instead of being told to pair.

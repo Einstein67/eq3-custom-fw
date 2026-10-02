@@ -13,7 +13,16 @@
  */
 import { beforeEach, expect, test } from 'bun:test'
 
-import { MIN_GAP_MS, QUIET_MS, reportFor, shouldRearm, watch } from './advert'
+import type { AdvertReport } from './advert'
+import {
+  EMPTY_REPORT,
+  MIN_GAP_MS,
+  QUIET_MS,
+  reportFor,
+  shouldRearm,
+  takenIn,
+  watch,
+} from './advert'
 
 // The two globals the module reaches for at runtime. `getService` is identity here: the module only
 // uses it to key the service-data map, and the test supplies both sides of that key.
@@ -162,4 +171,18 @@ test('a device that cannot be revived is not re-armed in a loop', () => {
   // Still silent, but only just re-armed: the gap is what stops a dead device pinning the radio.
   expect(shouldRearm(NOW - 60_000, NOW - (MIN_GAP_MS - 1), NOW)).toBe(false)
   expect(shouldRearm(NOW - 60_000, NOW - MIN_GAP_MS, NOW)).toBe(true)
+})
+
+test('takenIn trusts a fresh connectivity flag only, and knows nothing without one', () => {
+  const r = (v: boolean | undefined, when: number): AdvertReport => ({
+    ...EMPTY_REPORT,
+    values: v === undefined ? {} : { connectivity: v },
+    valuesAt: v === undefined ? {} : { connectivity: when },
+  })
+  expect(takenIn(r(true, NOW), NOW + 1000)).toBe(true)
+  expect(takenIn(r(false, NOW), NOW + 1000)).toBe(false)
+  // A 2.00 radio never airs it; an old flag may describe a link that has since closed.
+  expect(takenIn(r(true, NOW), NOW + 60_000)).toBe(null)
+  expect(takenIn(r(undefined, NOW), NOW)).toBe(null)
+  expect(takenIn(undefined, NOW)).toBe(null)
 })

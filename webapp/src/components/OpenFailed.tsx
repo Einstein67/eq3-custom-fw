@@ -2,7 +2,7 @@ import { useAtomValue, useSetAtom } from 'jotai'
 
 import { Sheet } from '@/components/Sheet'
 import { Button } from '@/components/ui/button'
-import { SUPPORTED as ADVERTS_SUPPORTED } from '@/device/advert'
+import { SUPPORTED as ADVERTS_SUPPORTED, takenIn } from '@/device/advert'
 import { grantedAtom, grantedSettledAtom } from '@/device/link'
 import { useChooseFor } from '@/device/useChooseFor'
 import { openFailedAtom, useRetryOpen } from '@/device/useRouteLink'
@@ -56,6 +56,8 @@ export function OpenFailed() {
   // own integration `[manually verified]`. Where this browser cannot watch broadcasts, "heard" is
   // unknowable, so that case names both causes rather than guessing one.
   const heardIt = adv.lastAt != null
+  // A 2.01 radio SAYS whether it is taken (connectivity); a 2.00 one does not, and keeps the guess.
+  const taken = takenIn(adv)
   return (
     <Sheet title={`Could not open ${name}`} onClose={() => clear(null)}>
       <div className="space-y-4">
@@ -67,6 +69,17 @@ export function OpenFailed() {
               here — <strong>every thermostat in it is called CC-RT-BLE</strong> unless you have
               renamed it, and this app says afterwards which one you actually picked. The banner on
               the thermostat list says which setting stops this happening every time.
+            </>
+          ) : heardIt && taken === true ? (
+            <>
+              {name} says in its broadcast that <strong>something else is connected to it right
+              now</strong>, and it takes one connection at a time. If Home Assistant manages this
+              thermostat, disable it there (or close any other app using it), then try again.
+            </>
+          ) : heardIt && taken === false ? (
+            <>
+              {name} is in range and says nothing is connected to it, so this attempt simply failed.
+              Try again.
             </>
           ) : heardIt ? (
             <>

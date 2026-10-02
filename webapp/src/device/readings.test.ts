@@ -25,10 +25,11 @@ test('a real set-0 payload reads as measurements, not as wire names', () => {
 })
 
 test('a real set-1 payload reads as words, never true or false', () => {
-  const { values } = decodeObjects(bytes('09000f0015001f012d00'))
+  const { values } = decodeObjects(bytes('09000f00150019001f012d00'))
   expect(describeValues(values).map((r) => `${r.label} ${r.text}`)).toEqual([
     // NO "battery warning none": a warning that is not warning is the absence of news, and it
     // appeared on every row, pushing the readings that ARE news along the line.
+    'connected no',
     'window closed',
     'buttons unlocked',
     'boost off',
@@ -54,7 +55,7 @@ test('the full table has the same rows before, during and after the two sets arr
   const nothing = shape({})
   expect(nothing).toEqual(BROADCAST_FIELDS)
   expect(shape(decodeObjects(bytes('029a0b0278050cde0c2f00')).values)).toEqual(nothing)
-  expect(shape(decodeObjects(bytes('09000f0015001f012d00')).values)).toEqual(nothing)
+  expect(shape(decodeObjects(bytes('09000f00150019001f012d00')).values)).toEqual(nothing)
   // Nothing heard yet is a dash per row, not a missing row.
   expect(describeAll({}).every((r) => r.text === null)).toBe(true)
   // And a warning that the compact view hides still has its line here.
@@ -66,7 +67,7 @@ test('the two columns are the two adverts — one fills while the other stays em
   // fill the first column and leave the second entirely unheard, and the other way round. If the
   // firmware ever moves an object between sets, this is what says so.
   const set0 = decodeObjects(bytes('029a0b0278050cde0c2f00')).values
-  const set1 = decodeObjects(bytes('09000f0015001f012d00')).values
+  const set1 = decodeObjects(bytes('09000f00150019001f012d00')).values
   const heard = (v: Record<string, BthomeValue>) =>
     describeSets(v).map((g) => g.every((r) => r.text !== null))
 
@@ -81,4 +82,13 @@ test('an object with no row in the table is still shown, under its wire name', (
     { key: 'temperature', label: 'current', text: '21.0°' },
     { key: 'something new', label: 'something new', text: '7' },
   ])
+})
+
+test('connected says who holds the link: no / yes (not you) / yes (you)', () => {
+  const text = (v: boolean, self: boolean) => describeValues({ connectivity: v }, { self })[0]!.text
+  expect(text(false, false)).toBe('no')
+  expect(text(true, false)).toBe('yes (not you)')
+  // Our own link is known before the broadcast catches up with it, so it wins over a stale `no`.
+  expect(text(false, true)).toBe('yes (you)')
+  expect(text(true, true)).toBe('yes (you)')
 })

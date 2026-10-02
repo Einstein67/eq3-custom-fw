@@ -18,11 +18,18 @@
 import type { BthomeValue } from './bthome.js'
 import { MODES } from './status'
 
+/**
+ * What a view knows that the broadcast cannot say: whether THIS app holds the thermostat's link.
+ * The broadcast's connectivity says only that something does.
+ */
+export type ReadingContext = { self: boolean }
+const NOT_SELF: ReadingContext = { self: false }
+
 type Spec = {
   /** What a person calls it. */
   label: string
   /** How the value reads. Booleans get both states, never "true"/"false". */
-  fmt: (v: BthomeValue) => string
+  fmt: (v: BthomeValue, ctx: ReadingContext) => string
   /**
    * True when this value is not worth a line in a COMPACT view — and it is only ever a WARNING
    * that is not warning. A battery that is fine and a problem that is not happening are the
@@ -49,6 +56,13 @@ const SPECS: Record<string, Spec> = {
   voltage: { label: 'battery', fmt: (v) => `${(v as number).toFixed(2)} V` },
   battery: { label: 'battery level', fmt: (v) => `${v as number}%` },
   battery_low: { label: 'battery', fmt: (v) => (v ? 'LOW' : 'ok'), quiet: (v) => !v },
+  // THE THERMOSTAT TAKES ONE CONNECTION, and this says who has it `[owner]`. Our own link is
+  // known here rather than read from the broadcast, which lags a connect by up to a flag-set
+  // round; the broadcast is what tells "nobody" from "something else", usually Home Assistant.
+  connectivity: {
+    label: 'connected',
+    fmt: (v, ctx) => (ctx.self ? 'yes (you)' : v ? 'yes (not you)' : 'no'),
+  },
   window: { label: 'window', fmt: (v) => (v ? 'open' : 'closed') },
   // BTHome's lock, as Home Assistant reads it: true = UNLOCKED.
   lock: { label: 'buttons', fmt: (v) => (v ? 'unlocked' : 'locked') },
@@ -73,11 +87,14 @@ export type Reading = { key: string; label: string; text: string }
  * Every value present, described. Known fields come in `SPECS` order; anything this table does not
  * know follows.
  */
-export function describeValues(values: Record<string, BthomeValue>): Reading[] {
+export function describeValues(
+  values: Record<string, BthomeValue>,
+  ctx: ReadingContext = NOT_SELF,
+): Reading[] {
   const known = ORDER.filter((k) => k in values && !SPECS[k]!.quiet?.(values[k]!)).map((k) => ({
     key: k,
     label: SPECS[k]!.label,
-    text: SPECS[k]!.fmt(values[k]!),
+    text: SPECS[k]!.fmt(values[k]!, ctx),
   }))
   return [...known, ...unknownOf(values)]
 }
@@ -103,7 +120,7 @@ const unknownOf = (values: Record<string, BthomeValue>): Reading[] =>
  */
 export const BROADCAST_SETS: string[][] = [
   ['temperature', 'temperature #2', 'moisture', 'voltage'],
-  ['window', 'lock', 'generic', 'battery_low', 'count'],
+  ['window', 'lock', 'generic', 'battery_low', 'count', 'connectivity'],
 ]
 
 /** Both sets, flat — for a view that does not care which advert a reading came in. */
@@ -119,8 +136,11 @@ export const BROADCAST_FIELDS = BROADCAST_SETS.flat()
  */
 export type MaybeReading = { key: string; label: string; text: string | null }
 
-export function describeAll(values: Record<string, BthomeValue>): MaybeReading[] {
-  return describeSets(values).flat()
+export function describeAll(
+  values: Record<string, BthomeValue>,
+  ctx: ReadingContext = NOT_SELF,
+): MaybeReading[] {
+  return describeSets(values, ctx).flat()
 }
 
 /**
@@ -130,12 +150,15 @@ export function describeAll(values: Record<string, BthomeValue>): MaybeReading[]
  * own: which advert an unknown object came in is not something we know, and inventing a third
  * column for it would say that we do.
  */
-export function describeSets(values: Record<string, BthomeValue>): MaybeReading[][] {
+export function describeSets(
+  values: Record<string, BthomeValue>,
+  ctx: ReadingContext = NOT_SELF,
+): MaybeReading[][] {
   const groups = BROADCAST_SETS.map((keys) =>
     keys.map((k) => ({
       key: k,
       label: SPECS[k]!.label,
-      text: k in values ? SPECS[k]!.fmt(values[k]!) : null,
+      text: k in values ? SPECS[k]!.fmt(values[k]!, ctx) : null,
     })),
   )
   groups[groups.length - 1]!.push(...unknownOf(values))

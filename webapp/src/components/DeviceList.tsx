@@ -528,7 +528,7 @@ function DeviceRow({
   // EVERYTHING THE BROADCAST CARRIES, AS BADGES, in the broadcast's own order and with nothing
   // lifted out `[owner]` — the target temperature included, beside the current one, so the pair is
   // read together. No reading is repeated anywhere else in the row.
-  const readings = describeValues(report.values)
+  const readings = describeValues(report.values, { self: state === 'connected' })
 
   return (
     <li>

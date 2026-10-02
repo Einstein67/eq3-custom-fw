@@ -42,7 +42,7 @@ import {
   readSettings,
   type Settings as DeviceSettings,
 } from './config'
-import { SUPPORTED as ADVERTS_SUPPORTED, heard, isWatched, resetDevice, watch } from './advert'
+import { SUPPORTED as ADVERTS_SUPPORTED, heard, isWatched, resetDevice, takenSays, watch } from './advert'
 import {
   ADV_NAME_PREFIX,
   ADV_NAME_STOCK,
@@ -1398,10 +1398,21 @@ async function open(d: BluetoothDevice) {
       // integration `[manually verified]`. Said only when it WAS heard:
       // unheard, the likelier cause is range, which `openLink` says instead.
       if (!heard(d.id)) throw e
+      // A 2.01 RADIO SAYS WHETHER IT IS TAKEN (connectivity, 0x19), which turns the guess into a
+      // fact in both directions; a 2.00 radio does not, and keeps the guess.
+      const taken = takenSays(d.id)
       throw new Error(
-        `${why(e)} — it is broadcasting, so it is in range. Something else is probably connected ` +
-          'to it: the thermostat takes one connection at a time. If Home Assistant manages this ' +
-          'thermostat, disable it there (or close any other app using it) and try again.',
+        taken === true
+          ? `${why(e)} — something else is connected to it right now (it says so in its broadcast), ` +
+              'and it takes one connection at a time. If Home Assistant manages this thermostat, ' +
+              'disable it there (or close any other app using it) and try again.'
+          : taken === false
+            ? `${why(e)} — it is in range and says nothing is connected to it, so this attempt ` +
+              'simply failed. Try again.'
+            : `${why(e)} — it is broadcasting, so it is in range. Something else is probably ` +
+              'connected to it: the thermostat takes one connection at a time. If Home Assistant ' +
+              'manages this thermostat, disable it there (or close any other app using it) and try ' +
+              'again.',
       )
     },
   )

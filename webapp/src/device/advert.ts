@@ -417,6 +417,26 @@ export const isWatched = (id: string) => watches.get(id)?.refused === null
  */
 export const heard = (id: string) => watches.get(id)?.report.lastAt != null
 
+/** How long the broadcast's connectivity flag is trusted: the flag set comes round every ~2 s. */
+const TAKEN_FRESH_MS = 30_000
+
+/**
+ * What the thermostat's own broadcast says about its one connection: `true` while something is
+ * connected to it, `false` while nothing is, `null` when it has not said so recently — a 2.00 radio
+ * airs no connectivity object (0x19), and a flag older than half a minute is not evidence.
+ *
+ * It is the radio's own state, read as each broadcast is built, so it replaces a guess: before it,
+ * "heard but would not connect" could only say that something was PROBABLY holding the thermostat.
+ */
+export function takenIn(r: AdvertReport | undefined, now = Date.now()): boolean | null {
+  const v = r?.values.connectivity
+  const at = r?.valuesAt.connectivity
+  return typeof v === 'boolean' && at != null && now - at < TAKEN_FRESH_MS ? v : null
+}
+
+/** `takenIn` for a device by its id, for code that holds an id rather than a report. */
+export const takenSays = (id: string, now = Date.now()) => takenIn(watches.get(id)?.report, now)
+
 /** Stop watching one device, or every device when called with nothing. */
 export function stopWatch(id?: string) {
   for (const [key, w] of watches) {

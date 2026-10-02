@@ -3,7 +3,7 @@ import { Radio } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { describeSets } from '@/device/readings'
-import { advertAtom } from '@/state/atoms'
+import { advertAtom, connectedAtom } from '@/state/atoms'
 
 import { Alert, AlertDescription } from './ui/alert'
 
@@ -40,6 +40,7 @@ function staleness(lastAt: number | null, now: number): string | null {
 
 export function LiveValues() {
   const adv = useAtomValue(advertAtom)
+  const connected = useAtomValue(connectedAtom)
   // A tick, because staleness is a function of the clock and nothing else re-renders when the
   // broadcasts STOP — which is precisely the case being reported.
   const [now, setNow] = useState(() => Date.now())
@@ -48,7 +49,7 @@ export function LiveValues() {
     return () => clearInterval(t)
   }, [])
   const stale = staleness(adv.lastAt, now)
-  const sets = describeSets(adv.values)
+  const sets = describeSets(adv.values, { self: connected })
 
   return (
     <section className="space-y-2">
