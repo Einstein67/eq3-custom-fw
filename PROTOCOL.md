@@ -586,11 +586,34 @@ nothing during it.
 | `0x1e` | 2.00 only | `1E <d5d4> <d3d2> <d1d0>` | Set the pairing PIN, packed BCD. Answers `01 1E <0 ok, 0xFF refused>` |
 | `0x1f` | 2.00 only | `1F A5` | Forget every paired phone. Answers `01 1F <0 ok, 0xFF refused>` |
 | `0x22` | 2.00 only | `22 <0..3>` | How often the thermostat announces itself; `0` just reports. Answers `01 22 <what it is set to, or 0xFF refused>` |
+| `0x24` | 2.01 only | `24` | How often, and why, each chip has restarted. Answers the 18-byte report below |
 | `0x51` | 2.00 only | `51 00 <off> <k×8>` · `51 01 A5` · `51 02` | Set, clear or report the encryption key |
 | `0x5b` | 2.00 only | `5B 00 <off> <b×8>` · `5B 01 <len> A5` · `5B 02` | Set, clear or report the advertised name |
 
 The last two are answered by the **radio**, not the thermostat chip, so they need the 2.00 radio image
-even on a thermostat already running 2.00. A stock radio drops them and says nothing.
+even on a thermostat already running 2.00. A stock radio drops them and says nothing. `0x24` is
+answered by the radio too, so it answers even while the thermostat chip is silent — which is when you
+want it.
+
+**`cmd 0x24` — the restart report.** The reply is 18 bytes, two-byte numbers low byte first:
+
+| byte | what |
+|---|---|
+| 0 | `24` |
+| 1 | why the **radio** last started: `0` a cold start (batteries in, or anything the radio cannot tell from one), `1` after a crash, `2` after a radio update began (applied, refused or abandoned), `3` any other restart |
+| 2–4 | how many radio restarts of kinds `1`, `2` and `3` since its last cold start (each stops at 255) |
+| 5–6 | minutes since the radio last started |
+| 7–8 | minutes since the thermostat chip last started, as the radio saw it; `FFFF` when the radio has restarted since, and bytes 9–17 are then the last report it kept |
+| 9 | the thermostat chip's raw reset flags when it last started |
+| 10 | why the **thermostat chip** last started: which flags were new (bit 0 power-on, 1 watchdog, 2 illegal instruction, 3 programming adapter, 5 brown-out), `40` when the flags were cleared (a power-on, or entering an update), `80` when nothing was new |
+| 11–17 | how many thermostat-chip starts of each kind: power-on, watchdog, illegal instruction, programming adapter, (unnamed flag), brown-out, and unknown. They count for the life of the unit; a factory reset keeps them |
+
+**What the thermostat chip can tell, and what it cannot.** Its reset flags stay set until the next
+power-on, and the firmware never clears them, because an all-zero value would stop the thermostat from
+starting its own firmware. So each cause is recognised the **first** time it happens after a power-on,
+and a repeat before the next power-on is counted as unknown. A firmware update shows up as the
+updater's own watchdog restart. The radio's counters live in memory that survives a restart but not a
+power-off, so they start again from zero whenever the batteries come out.
 
 **`cmd 0x1D` items:**
 
