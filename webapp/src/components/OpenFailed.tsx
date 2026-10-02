@@ -2,10 +2,11 @@ import { useAtomValue, useSetAtom } from 'jotai'
 
 import { Sheet } from '@/components/Sheet'
 import { Button } from '@/components/ui/button'
+import { SUPPORTED as ADVERTS_SUPPORTED } from '@/device/advert'
 import { grantedAtom, grantedSettledAtom } from '@/device/link'
 import { useChooseFor } from '@/device/useChooseFor'
 import { openFailedAtom, useRetryOpen } from '@/device/useRouteLink'
-import { openDeviceAtom } from '@/state/atoms'
+import { advertAtom, openDeviceAtom } from '@/state/atoms'
 import { leaveAtom } from '@/state/route'
 
 /**
@@ -42,6 +43,7 @@ export function OpenFailed() {
    * failure atom would be two answers to one question.
    */
   const row = useAtomValue(openDeviceAtom)
+  const adv = useAtomValue(advertAtom)
   if (!name) return null
   // **ONE OF THESE FAILURES CANNOT BE RETRIED, and offering Try again for it is a loop.** A browser
   // that hands the page no saved thermostat will hand it none on the next press either — the only
@@ -49,6 +51,11 @@ export function OpenFailed() {
   // button that works. The two atoms are read here rather than carried in with the name because
   // they are live: what makes this case true can stop being true while the dialog is open.
   const dry = settled && granted === 0
+  // HEARD BUT NOT OPENED IS USUALLY SOMEBODY ELSE'S LINK `[owner]`: the thermostat takes one
+  // connection at a time and keeps broadcasting while it is held — most often by Home Assistant's
+  // own integration `[manually verified]`. Where this browser cannot watch broadcasts, "heard" is
+  // unknowable, so that case names both causes rather than guessing one.
+  const heardIt = adv.lastAt != null
   return (
     <Sheet title={`Could not open ${name}`} onClose={() => clear(null)}>
       <div className="space-y-4">
@@ -61,10 +68,23 @@ export function OpenFailed() {
               renamed it, and this app says afterwards which one you actually picked. The banner on
               the thermostat list says which setting stops this happening every time.
             </>
+          ) : heardIt ? (
+            <>
+              {name} is broadcasting, so it is in range — but it would not take a connection. It
+              takes one connection at a time, so <strong>something else is probably connected to
+              it</strong>. If Home Assistant manages this thermostat, disable it there (or close any
+              other app using it), then try again.
+            </>
+          ) : ADVERTS_SUPPORTED ? (
+            <>
+              It has not been heard from — out of range, or it has stopped broadcasting — or this
+              browser would not hand it back.
+            </>
           ) : (
             <>
-              Either it has not been heard from — out of range, or it has stopped broadcasting — or
-              this browser would not hand it back.
+              It may be out of range, or something else may be connected to it — it takes one
+              connection at a time, so if Home Assistant manages this thermostat, disable it there.
+              Or this browser would not hand it back.
             </>
           )}
         </p>

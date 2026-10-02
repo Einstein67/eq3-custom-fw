@@ -1374,7 +1374,21 @@ async function open(d: BluetoothDevice) {
   // takes away, and reloading the page is the only way out. Failing instead lands in `connectTo`'s
   // catch, which puts the button back. Generous, because this call waits for a device to be in
   // range and answer at all.
-  const server = await bounded('connecting', CONNECT_TIMEOUT_MS, d.gatt!.connect())
+  const server = await bounded('connecting', CONNECT_TIMEOUT_MS, d.gatt!.connect()).catch(
+    (e: unknown) => {
+      // HEARD BUT NOT CONNECTABLE IS USUALLY SOMEBODY ELSE'S LINK `[owner]`. The thermostat takes
+      // one connection at a time and keeps broadcasting while it is held, so a unit that is plainly
+      // on the air and still refuses is most often held by Home Assistant's own thermostat
+      // integration `[manually verified]`. Said only when it WAS heard:
+      // unheard, the likelier cause is range, which `openLink` says instead.
+      if (!heard(d.id)) throw e
+      throw new Error(
+        `${why(e)} — it is broadcasting, so it is in range. Something else is probably connected ` +
+          'to it: the thermostat takes one connection at a time. If Home Assistant manages this ' +
+          'thermostat, disable it there (or close any other app using it) and try again.',
+      )
+    },
+  )
   // A NEW LINK RETIRES EVERY QUESTION ASKED OF THE OLD ONE — the `W30` generation rule, header.
   const old = links.get(d.id)
   if (old) tearDown(old)

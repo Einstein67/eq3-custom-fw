@@ -642,17 +642,16 @@ function VersionChoice({
                 <span>
                   {releaseText(r.version, r.radio.expect)}
                 </span>
-                {isCurrent(r) ? (
-                  <Badge variant="secondary" className="font-normal">
+                {/* TWO INDEPENDENT BADGES `[owner]`: one says what the thermostat runs, the other
+                    where the firmware comes from, so neither hides the other. "installed" takes
+                    the app's GOOD green; "unofficial" the accent, because it is not a judgement
+                    and the gold and red stops would read as one. */}
+                {isCurrent(r) && (
+                  <Badge className="font-normal text-white" style={{ backgroundColor: GOOD_TINT }}>
                     installed
                   </Badge>
-                ) : (
-                  r.mod && (
-                    <Badge variant="secondary" className="font-normal">
-                      this project
-                    </Badge>
-                  )
                 )}
+                {r.mod && <Badge className="font-normal">unofficial</Badge>}
               </span>
             </SelectItem>
           ))}
