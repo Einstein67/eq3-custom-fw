@@ -1534,13 +1534,27 @@ async function introduce(l: Link, server: BluetoothRemoteGATTServer, d: Bluetoot
   // its own `[manually verified]` — 15 s connected and running, nothing sent, zero frames — so this
   // is where the mode, setpoint, valve and flags come from.
   //
-  // **It will start the adaptation phase if the thermostat was sitting on the date screen after
-  // boot** `[owner]`.
-  await step(l, 'the time', async () => {
-    const r = await request(setDateTime(new Date()), isStatus, 1, l)
-    if (r) setStatus(l, decodeStatus(r))
-    return null
-  })
+  // **NOT ON A THERMOSTAT THAT HAS NOT SAID WHICH ONE IT IS** `[owner]`. Setting the clock is a
+  // WRITE, and it is not a harmless one: on a device sitting on the date screen after a boot it
+  // starts the valve adaptation, which moves the motor. Doing that as a side effect of connecting
+  // is wrong anywhere, and it is plainly wrong on the one screen this state leads to — a thermostat
+  // that cannot identify itself has exactly one thing on offer, REINSTALL, and provisioning the
+  // firmware you are about to overwrite is work the person did not ask for.
+  //
+  // A device with no identity also has no status worth reading: nothing can be filed against a row
+  // that does not exist, so the reply this step exists to collect has nowhere to go either.
+  //
+  // `python-scripts/flash.py` takes the same line for the same reason and says so in its header —
+  // it writes two images and sends no commands at all. This is the app matching it.
+  if (serial) {
+    await step(l, 'the time', async () => {
+      const r = await request(setDateTime(new Date()), isStatus, 1, l)
+      if (r) setStatus(l, decodeStatus(r))
+      return null
+    })
+  } else {
+    log('this thermostat did not say which one it is, so its clock was left alone')
+  }
   //
   // Whatever did not arrive, keep asking for. That covers the name too, which is why there is no
   // separate call for it: the chase's first round IS the first ask. Not awaited — it outlives this

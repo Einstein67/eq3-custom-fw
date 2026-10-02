@@ -74,10 +74,10 @@ export function UnsavedDevice() {
       <main className="flex-1 space-y-4 px-4 pb-10 pt-2">
         <Alert variant="warn">
           <AlertDescription>
-            <strong>This thermostat has not said which one it is</strong>, so it cannot be saved to
-            your list. That is what one does when a firmware install was interrupted — and it can
-            still be reinstalled from here. Once it runs a working firmware it answers again, and
-            you can add it from the list as usual.
+            <strong>This thermostat has not said which one it is.</strong> So it cannot be saved to
+            your list. That is what an interrupted firmware install leaves behind, and it can still
+            be reinstalled from here. Once it runs a working firmware it answers again, and you can
+            add it from the list as usual.
           </AlertDescription>
         </Alert>
 
