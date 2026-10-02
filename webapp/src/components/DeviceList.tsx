@@ -42,6 +42,7 @@ import {
   openIdAtom,
   openUnsavedAtom,
   registryAtom,
+  registryPresetsAtom,
 } from '@/state/atoms'
 import { registry, type Thermostat } from '@/state/registry'
 
@@ -69,6 +70,8 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
  */
 export function DeviceList() {
   const devices = useAtomValue(registryAtom)
+  // Saved programmes travel in the same file (state/registry.ts), so they count towards Export too.
+  const presets = useAtomValue(registryPresetsAtom)
   const granted = useAtomValue(grantedAtom)
   const grantedSettled = useAtomValue(grantedSettledAtom)
   const openId = useSetAtom(openIdAtom)
@@ -239,12 +242,13 @@ export function DeviceList() {
     a.download = 'thermostats.json'
     a.click()
     URL.revokeObjectURL(url)
-    log(`exported ${devices.length} thermostat${devices.length === 1 ? '' : 's'}`)
+    log(`exported ${counted(devices.length, presets.length)}`)
   }
 
   const importFile = async (f: File) => {
     try {
-      log(`imported ${registry.importJson(await f.text())} thermostats`)
+      const n = registry.importJson(await f.text())
+      log(`imported ${counted(n.devices, n.presets)}`)
     } catch (e) {
       log(`that file could not be read: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -379,7 +383,7 @@ export function DeviceList() {
           variant="outline"
           className="flex-1 text-muted-foreground"
           onClick={exportFile}
-          disabled={devices.length === 0}
+          disabled={devices.length === 0 && presets.length === 0}
         >
           <Download /> Export
         </Button>
@@ -492,6 +496,12 @@ function PendingRow({
  * How long ago, in the coarsest unit that is still true. `now` is passed in rather than read here —
  * see the list's ticking clock.
  */
+/** "2 thermostats and 1 saved programme" -- what an import or export moved, in words. */
+function counted(devices: number, presets: number): string {
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
+  return `${n(devices, 'thermostat')} and ${n(presets, 'saved programme')}`
+}
+
 function ago(at: number, now: number): string {
   // An advert that lands between two ticks is newer than `now`; it is 0 s old, not -1.
   const s = Math.max(0, Math.round((now - at) / 1000))

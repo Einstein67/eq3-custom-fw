@@ -51,6 +51,9 @@ Built on 2.00. Both the radio and the thermostat change.
 
 **In the app and the tools:**
 
+- **Export and Import on the thermostat list carry your saved programmes**, and say how many they
+  moved. Export works with saved programmes alone, and a file holding only programmes imports.
+
 - **The app reads the broadcast the way Home Assistant does.** It knows every BTHome object, with
   Home Assistant's names and scaling, so a new object no longer hides the ones after it.
   Update the app before the thermostat's radio: an older app loses the lock and window readings

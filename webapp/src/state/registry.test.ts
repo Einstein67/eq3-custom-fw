@@ -119,7 +119,7 @@ test('an export re-imported into a fresh registry restores the names and the key
   const file = a.exportJson()
 
   const b = fresh() // the same registry, emptied — a new phone, or a reinstalled browser
-  expect(b.importJson(file)).toBe(3)
+  expect(b.importJson(file)).toEqual({ devices: 3, presets: 0 })
   expect(b.get('00:1A:22:AA:BB:CC')?.name).toBe('Bedroom')
   expect(b.get('00:1a:22:aa:bb:cc')?.key).toBe(KEY)
   expect(b.get('00:1a:22:01:02:03')?.pin).toBe('424242')
@@ -142,9 +142,27 @@ test('an import keeps THIS origin’s reconnect handle, which the file cannot ca
   expect(row.deviceId).toBe('granted-here') // ...except for the handle, which is not in the file
 })
 
+test('saved programmes travel in the export and come back on import', () => {
+  const week = [[{ until: 144, temp: 42 }]]
+  const a = fresh()
+  a.upsert({ mac: '00:1a:22:aa:bb:cc', name: 'Bedroom' })
+  a.savePreset('Winter', week)
+  const file = a.exportJson()
+  const b = fresh() // the same store, emptied -- so the file is taken first
+  expect(b.importJson(file)).toEqual({ devices: 1, presets: 1 })
+  expect(b.presets()).toEqual([{ name: 'Winter', week }])
+})
+
+test('a file holding only saved programmes imports', () => {
+  const b = fresh()
+  const file = toExport({ version: 1, devices: [], presets: [{ name: 'Holiday', week: [[]] }] })
+  expect(b.importJson(file)).toEqual({ devices: 0, presets: 1 })
+  expect(b.presets().map((p) => p.name)).toEqual(['Holiday'])
+})
+
 test('an empty or unreadable file is refused with something a person can read', () => {
   expect(() => merge({ version: 1, devices: [], presets: [] },'{"version":1,"devices":[]}')).toThrow(
-    'no thermostats in that file',
+    'no thermostats or saved programmes in that file',
   )
   expect(() => merge({ version: 1, devices: [], presets: [] },'garbage')).toThrow()
 })

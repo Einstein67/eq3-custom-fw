@@ -160,8 +160,10 @@ export function parse(raw: string | null): Registry {
   if (!raw) return EMPTY
   try {
     const v = JSON.parse(raw) as Partial<Registry>
-    if (!Array.isArray(v.devices)) return EMPTY
-    const devices = v.devices
+    if (!v || typeof v !== 'object') return EMPTY
+    // A file of saved programmes alone is a real file -- the programmes are shared between
+    // thermostats, so they are worth carrying without any -- so no devices is an empty list here.
+    const devices = (Array.isArray(v.devices) ? v.devices : [])
       // A ROW NEEDS AN IDENTIFIER AND DOES NOT MIND WHICH. Files written before the serial existed
       // carry a MAC and no `id`, and a row keyed by MAC is still a perfectly good row — so the MAC
       // becomes its id and stays its id, which is the same stickiness `upsert` relies on.
@@ -202,7 +204,8 @@ export function toExport(r: Registry): string {
  */
 export function merge(current: Registry, incoming: string): Registry {
   const add = parse(incoming)
-  if (add.devices.length === 0) throw new Error('no thermostats in that file')
+  if (add.devices.length === 0 && add.presets.length === 0)
+    throw new Error('no thermostats or saved programmes in that file')
   const by = new Map(current.devices.map((d) => [d.id, d]))
   for (const d of add.devices) {
     const had = by.get(d.id)
@@ -360,10 +363,14 @@ export const registry = {
 
   exportJson: () => toExport(state()),
 
-  /** Returns how many rows the file held, or throws with something a person can read. */
+  /**
+   * Returns how many thermostats and saved programmes the FILE held -- what the person just
+   * imported, not the merged total -- or throws with something a person can read.
+   */
   importJson(text: string) {
     const next = merge(state(), text)
+    const file = parse(text)
     commit(next)
-    return next.devices.length
+    return { devices: file.devices.length, presets: file.presets.length }
   },
 }
