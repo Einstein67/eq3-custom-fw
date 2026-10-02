@@ -20,7 +20,7 @@
     {
       "version": "2.01",
       "mod": true,
-      "note": "Everything 2.00 does, using less battery. A connected thermostat answers faster on one steady rhythm; some adapters no longer keep it awake; a phone or hub that vanishes is given up after 6 s instead of 30. The broadcast interval survives a radio update. Home Assistant can pair through an ESPHome proxy with the PIN on. No more Home Assistant warning on every broadcast, and the low-battery warning is back at 2.4 V on every thermostat. Debug code from development is removed.",
+      "note": "Everything 2.00 does, using less battery. A connected thermostat answers faster on one steady rhythm; some adapters no longer keep it awake; a phone or hub that vanishes is given up after 6 s instead of 30. The broadcast interval survives a radio update. Home Assistant can pair through an ESPHome proxy with the PIN on. No more Home Assistant warning on every broadcast, and the low-battery warning is back at 2.4 V on every thermostat. The broadcast says whether something is already connected. The room, clock and valve screens keep the weekday, schedule bar and icons of the normal screen; commands no longer draw over a menu, the valve adaptation or an error code; and an error code (F1-F3) still answers Home Assistant and the app. Debug code from development is removed.",
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,
