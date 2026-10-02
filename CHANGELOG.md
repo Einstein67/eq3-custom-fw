@@ -9,11 +9,17 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline
   and rechargeable cells alike. 2.00 moved it on a thermostat whose brown-out setting had been
   changed, and could warn only moments before the batteries gave out.
-- **A thermostat that Home Assistant keeps connected uses less battery.** Home Assistant speeds
-  the connection up to its fastest rhythm whenever it connects, and one integration does that on
-  every poll. The radio now asks for its slow, power-saving rhythm back three seconds later, where
-  it used to stay fast for half a minute or, after a connect, for good. It also checks which rhythm
-  is actually running, so a request the phone or computer did not apply is asked for again.
+- **A connected thermostat uses less battery and answers faster.** The radio now settles on one
+  rhythm for the whole connection instead of stepping through three, chosen by measuring every
+  Bluetooth adapter we have and an ESPHome proxy through Home Assistant: a single request is
+  answered in well under a second, and a burst of 20 in a few seconds. When Home Assistant (or
+  anything else) speeds the connection up, the radio asks for its rhythm back about a second after
+  things go quiet, and it checks which rhythm is actually running, so a request the other side did
+  not apply is asked for again. Firmware updates still run at full speed.
+- **Some Bluetooth adapters no longer keep the thermostat awake.** Certain adapters announce their
+  channel changes far in advance, and until the change the radio used to wake at every connection
+  event. It now keeps sleeping in between and wakes just before the change, which more than halves
+  the battery a held connection costs on such an adapter.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 
