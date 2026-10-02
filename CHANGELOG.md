@@ -27,9 +27,6 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The broadcast interval you picked survives a radio update.** The radio used to forget it and fall
   back to about one second until the thermostat itself restarted, which could take weeks; it now
   remembers the choice and puts it back when it starts.
-- **The thermostat keeps a record of its restarts.** Both chips count how often they have restarted
-  and why — power-on, crash, watchdog, update, programming adapter — and an app can ask for it at any
-  time, even when the thermostat chip itself is not answering.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 

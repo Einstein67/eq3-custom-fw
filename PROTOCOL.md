@@ -586,34 +586,11 @@ nothing during it.
 | `0x1e` | 2.00 only | `1E <d5d4> <d3d2> <d1d0>` | Set the pairing PIN, packed BCD. Answers `01 1E <0 ok, 0xFF refused>` |
 | `0x1f` | 2.00 only | `1F A5` | Forget every paired phone. Answers `01 1F <0 ok, 0xFF refused>` |
 | `0x22` | 2.00 only | `22 <0..3>` | How often the thermostat announces itself; `0` just reports. Answers `01 22 <what it is set to, or 0xFF refused>` |
-| `0x24` | 2.01 only | `24` | How often, and why, each chip has restarted. Answers the 18-byte report below |
 | `0x51` | 2.00 only | `51 00 <off> <k×8>` · `51 01 A5` · `51 02` | Set, clear or report the encryption key |
 | `0x5b` | 2.00 only | `5B 00 <off> <b×8>` · `5B 01 <len> A5` · `5B 02` | Set, clear or report the advertised name |
 
 The last two are answered by the **radio**, not the thermostat chip, so they need the 2.00 radio image
-even on a thermostat already running 2.00. A stock radio drops them and says nothing. `0x24` is
-answered by the radio too, so it answers even while the thermostat chip is silent — which is when you
-want it.
-
-**`cmd 0x24` — the restart report.** The reply is 18 bytes, two-byte numbers low byte first:
-
-| byte | what |
-|---|---|
-| 0 | `24` |
-| 1 | why the **radio** last started: `0` a cold start (batteries in, or the thermostat chip restarting the radio from deep sleep, which looks the same to it), `1` after a crash, `2` after a radio update began (applied, refused or abandoned), `3` any other restart |
-| 2–4 | how many radio restarts of kinds `1`, `2` and `3` since its last cold start (each stops at 255) |
-| 5–6 | minutes since the radio last started |
-| 7–8 | minutes since the thermostat chip last started, as the radio saw it; `FFFF` when the radio has restarted since, and bytes 9–17 are then the last report it kept |
-| 9 | the thermostat chip's raw reset flags when it last started |
-| 10 | why the **thermostat chip** last started: which flags were new (bit 0 power-on, 1 watchdog, 2 illegal instruction, 3 programming adapter, 5 brown-out), `40` when the flags were cleared (a power-on, or entering an update), `80` when nothing was new |
-| 11–17 | how many thermostat-chip starts of each kind: power-on, watchdog, illegal instruction, programming adapter, (unnamed flag), brown-out, and unknown. They count for the life of the unit; a factory reset keeps them |
-
-**What the thermostat chip can tell, and what it cannot.** Its reset flags stay set until the next
-power-on, and the firmware never clears them, because an all-zero value would stop the thermostat from
-starting its own firmware. So each cause is recognised the **first** time it happens after a power-on,
-and a repeat before the next power-on is counted as unknown. A firmware update shows up as the
-updater's own watchdog restart. The radio's counters live in memory that survives a restart but not a
-power-off, so they start again from zero whenever the batteries come out.
+even on a thermostat already running 2.00. A stock radio drops them and says nothing.
 
 **`cmd 0x1D` items:**
 
@@ -782,7 +759,28 @@ addresses move between firmware releases. Use `cmd 0x16` for settings.
 | `0x52` | 2.00 only | `52 <a0 a1 a2> <n>` | **Development only.** Read radio memory |
 | `0x53` | 2.00 only | `53 <a0 a1 a2> <n> <b×n>` | **Development only.** Write radio memory. No reply |
 | `0x54` | 2.00 only | `54 <a0 a1 a2>` | **Development only.** Call a radio routine. No reply |
+| `0x24` | 2.01 only | `24` | **Development only.** The reset counters of both chips, answered by the radio. Answers the 17 bytes below |
 
+**`cmd 0x24` — the reset counters.** They exist to show that nothing is resetting, so they count
+resets and nothing else: a power-on is not one. The radio answers, so it works while the thermostat
+chip is silent. Two-byte numbers are low byte first:
+
+| byte | what |
+|---|---|
+| 0 | `24` |
+| 1 | why the **radio** last started: `0` a cold start (batteries in, or the thermostat chip restarting the radio from deep sleep, which looks the same to it), `1` after a crash, `2` after a radio update began (applied, refused or abandoned), `3` any other restart |
+| 2–4 | how many radio restarts of kinds `1`, `2` and `3` since its last cold start (each stops at 255) |
+| 5–6 | minutes since the radio last started |
+| 7–8 | minutes since the thermostat chip last started, as the radio saw it; `FFFF` when the radio has restarted since, and bytes 9–16 are then the last ones it kept |
+| 9 | the thermostat chip's raw reset flags when it last started |
+| 10 | what that start was: the reset flags that were new (bit 1 watchdog, 2 illegal instruction, 3 programming adapter, 5 brown-out), `40` not a reset (a power-on, or entering an update), `80` a reset of unknown cause |
+| 11–16 | how many thermostat-chip resets of each kind: watchdog, illegal instruction, programming adapter, (unnamed flag), brown-out, unknown |
+
+**What the thermostat chip can tell, and what it cannot.** Its reset flags stay set until the next
+power-on, and the firmware never clears them, because an all-zero value would stop the thermostat from
+starting its own firmware. So each cause is recognised the **first** time it happens after its flag
+was cleared, and a repeat before then is counted as unknown. The radio's counters live in memory that
+survives a restart but not a power-off, so they start again from zero whenever the batteries come out.
 **`cmd 0x04` writes RAM only. On stored settings it acknowledges and does nothing** — it echoes your
 byte while the cell keeps its old value, which is indistinguishable from a successful write. Use the
 command that owns the setting.
@@ -798,9 +796,9 @@ button cannot express.
 also switches the broadcast off and the PIN gate on. The way back is `1D 01 01` then `1D 02 00`, in
 that order.
 
-**The six `Development only` ids above are one switch, and it covers both chips.** A development
-build answers all six. A release build answers none of them: `0x18`, `0x04` and `0x0a` come back as
-the thermostat's plain "id I do not know" refusal, and `0x52`–`0x54` come back as nothing at all,
+**The seven `Development only` ids above are one switch, and it covers both chips.** A development
+build answers all seven. A release build answers none of them: `0x18`, `0x04` and `0x0a` come back as
+the thermostat's plain "id I do not know" refusal, and `0x52`–`0x54` and `0x24` come back as nothing at all,
 because the radio no longer listens for them. **`cmd 0x19` is the one thing here that works on
 both** — it is an input rather than a memory access, and the buttons of the screen mirror are a
 shipped feature. Reading the screen is `cmd 0x23` in section 5.5, which needs no address and is not
