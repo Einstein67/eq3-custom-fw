@@ -122,7 +122,7 @@
   ],
   "rescue_radio": {
     "file": "rescue-radio.bin",
-    "bytes": 19128,
-    "sha256": "4fa90838ecc7253f9fac2a3f9ecbb4b7487cb38d0e9f86ffab9d1347a477fb88"
+    "bytes": 27344,
+    "sha256": "f9e8129cd87c4d64407d76c64c2bea107f56ff1063cd05b7721858c45ba3c59d"
   }
 }
