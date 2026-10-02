@@ -9,6 +9,10 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline
   and rechargeable cells alike. 2.00 moved it on a thermostat whose brown-out setting had been
   changed, and could warn only moments before the batteries gave out.
+- **A thermostat that Home Assistant keeps connected uses less battery.** Home Assistant speeds
+  the connection up to its fastest rhythm whenever it connects, and one integration does that on
+  every poll. The radio now asks for its slow, power-saving rhythm back three seconds later, where
+  it used to stay fast for half a minute or, after a connect, for good.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 
