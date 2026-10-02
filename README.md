@@ -2,6 +2,8 @@
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/dbuezas)
 
+All the added features, fixes and optimisations this firmware has are in the **[changelog](CHANGELOG.md)**.
+
 ## ▶ [Open the app: dbuezas.github.io/eq3-custom-fw](https://dbuezas.github.io/eq3-custom-fw/)
 
 It runs in your browser, talks to the thermostat over Bluetooth, and needs nothing installed.
@@ -19,8 +21,8 @@ as a remote control, and longer battery life.
 
 Every eQ-3 firmware version is here too, so you can always put it back exactly as it was.
 
-**[What's new →](CHANGELOG.md)**  ·  **[Bluetooth protocol →](PROTOCOL.md)** — everything a program
-needs to talk to a thermostat, if you want to build your own integration or app.
+**[Bluetooth protocol →](PROTOCOL.md)** — everything a program needs to talk to a thermostat, if you
+want to build your own integration or app.
 
 **[Home Assistant forum post →](https://community.home-assistant.io/t/custom-firmware-for-the-eq-3-cc-rt-ble-bthome-broadcasts-50-more-battery/1025955)**
 
