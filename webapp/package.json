@@ -8,7 +8,7 @@
     "build": "oxlint && tsc -b && vite build",
     "lint": "oxlint",
     "typecheck": "tsc -b",
-    "test": "node src/device/bthome.test.mjs && bun test .test.ts .test.tsx",
+    "test": "node src/device/bthome.test.mjs && bun test --isolate .test.ts .test.tsx",
     "preview": "vite preview"
   },
   "dependencies": {

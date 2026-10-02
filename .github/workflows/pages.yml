@@ -43,16 +43,17 @@ jobs:
 
       # Bun, because that is what builds and tests this app locally -- `bun.lock` is the lockfile in
       # the repo, and installing with anything else would resolve a different tree than the one that
-      # was tested.
+      # was tested. PINNED, not `latest`: the test script's `--isolate` needs 1.4 or newer, and a pin
+      # means a new bun release cannot change how the suite runs without a commit saying so.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
 
       - name: Install
         run: bun install --frozen-lockfile
 
-      # The tests gate the deploy: 239 of them in about five seconds, so there is no reason to
-      # publish a build that has not passed them.
+      # The tests gate the deploy: they take seconds, so there is no reason to publish a build that
+      # has not passed them.
       #
       # **`bun run test`, NEVER a bare `bun test`** -- and this is the one line here that has already
       # been wrong. `src/device/bthome.test.mjs` is its own runner and ends in `process.exit`, which

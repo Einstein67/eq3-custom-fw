@@ -151,7 +151,10 @@ test('...AND ANCHORED TO THE DEPLOY BASE, because a project page is not at the h
     expect(catalogueUrl()).toBe('/eq3-custom-fw/firmware/catalogue.json')
     expect(imageUrl('stm8-2.00.enc')).toBe('/eq3-custom-fw/firmware/stm8-2.00.enc')
   } finally {
-    import.meta.env.BASE_URL = real
+    // DELETE when it was unset: under bun `import.meta.env` stores strings, so writing `undefined`
+    // back leaves the text "undefined" and every later URL reads `undefinedfirmware/…`.
+    if (real === undefined) delete import.meta.env.BASE_URL
+    else import.meta.env.BASE_URL = real
   }
 })
 
