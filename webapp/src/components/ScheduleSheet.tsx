@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai'
-import { Plus, Trash2 } from 'lucide-react'
+import { FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { log } from '@/state/log'
@@ -317,12 +317,16 @@ function Presets({
         <ul className="space-y-1">
           {presets.map((p) => (
             <li key={p.name} className="flex items-center gap-2">
+              {/* FILLED, WITH A LOAD ICON `[owner]`. An outlined full-width row with plain
+                  left-aligned text is exactly how this app draws a text field -- the name box
+                  below is one -- so the saved programmes read as inputs, not as things to load. */}
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => onLoad(p.week.map(fromWire))}
-                className="flex-1 justify-start font-normal"
+                className="min-w-0 flex-1 justify-start font-normal"
               >
-                {p.name}
+                <FolderOpen />
+                <span className="truncate">{p.name}</span>
               </Button>
               <Button
                 variant="ghost"
