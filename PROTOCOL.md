@@ -118,12 +118,17 @@ only by which comes first. A decoder that indexes by id alone gets one of the tw
 | `0x09` | mode | 0 auto, 1 manual, 2 holiday |
 | `0x0F` | boost running | 1 = running |
 | `0x15` | battery low | 1 = low |
+| `0x19` | connectivity — something is connected to the thermostat | 1 = connected (2.01 and later) |
 | `0x1F` | lock | **inverted** — 1 = *un*locked |
 | `0x2D` | window open | 1 = open |
 
 These go out in ascending object-id order, which is what Home Assistant's BThome decoder asks for.
-A 2.00 radio sends the same five as `0x2D 0x1F 0x0F 0x15 0x09`; a decoder that reads by object id
-takes both.
+A 2.00 radio sends five of them, without `0x19`, as `0x2D 0x1F 0x0F 0x15 0x09`; a decoder that
+reads by object id takes both.
+
+**`0x19` says whether the thermostat is already taken.** It accepts one connection at a time, so
+while it reads 1 another client cannot connect — most often Home Assistant holding a link. It is read
+when each advertisement is built, so it follows a connect or a disconnect within one advertisement.
 
 **Set C — a button or wheel event** (only when one happens):
 
@@ -144,7 +149,9 @@ timestamps everything with "when the last advertisement arrived" will believe th
 fresher than a value a command reply just corrected. Keep a per-value timestamp.
 
 **An unknown object id must stop the walk, not be skipped.** The id is what gives each object its
-length, so guessing past one re-reads every following byte as the wrong field.
+length, so guessing past one re-reads every following byte as the wrong field. So a decoder should
+know every BTHome object, not only these: Home Assistant's own table is the `bthome-ble` library,
+and the app's copy of it is `webapp/src/device/bthome_objects.js`.
 
 ### When the broadcast is encrypted
 

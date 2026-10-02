@@ -26,6 +26,12 @@
    "device_info": 65,
    "plaintext": "09000f0015001f012d00",
    "counter": 533
+  },
+  {
+   "raw": "413e7227764feddbf8704736651c02000096a114aa",
+   "device_info": 65,
+   "plaintext": "09000f00150019001f012d00",
+   "counter": 540
   }
  ]
 }

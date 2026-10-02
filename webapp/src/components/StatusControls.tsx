@@ -126,8 +126,10 @@ export function StatusControls() {
    */
   const advFlag = (k: string) =>
     freshEnough(k) && typeof adv.values[k] === 'boolean' ? (adv.values[k] as boolean) : null
-  const boost = advFlag('boost/generic') ?? !!status?.boost
-  const lock = advFlag('lock') ?? !!status?.lock
+  const boost = advFlag('generic') ?? !!status?.boost
+  // BTHome's lock is true when UNLOCKED, as Home Assistant reads it; this flag means "locked".
+  const advUnlocked = advFlag('lock')
+  const lock = advUnlocked === null ? !!status?.lock : !advUnlocked
   const window = advFlag('window') ?? !!status?.window
   const room = typeof adv.values.temperature === 'number' ? (adv.values.temperature as number) : null
 

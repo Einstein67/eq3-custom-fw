@@ -22,6 +22,8 @@
 // and the bind key from the owner and remember them. A device with no bind key airs plain BThome and
 // needs neither. This is a platform limit, not something to work around.
 
+import { BTHOME_OBJECTS } from "./bthome_objects.js";
+
 const CCM_M = 4;                         // tag length, bytes -- BThome v2
 const CCM_L = 2;                         // length field, bytes -- so the nonce is 15 - L = 13
 
@@ -109,35 +111,39 @@ export async function decryptAdvert(keyRaw, mac, payload) {
 }
 
 // ---- objects -------------------------------------------------------------------------------
-// MIRRORS ble_chip/tools/scan_bthome.py's OBJECTS, WHICH IS THE CANONICAL TABLE. A new id belongs
-// there first. The names are that table's names on purpose, not prettier ones: `0x2F` is
-// "moisture/valve" because BThome calls it moisture and this device puts the valve position in it,
-// and a page that renamed it would be the second table in the tree disagreeing about what an id
-// means -- the exact thing scan_bthome's own header says must never happen.
-const s16 = (b, i) => { const v = b[i] | (b[i + 1] << 8); return v & 0x8000 ? v - 0x10000 : v; };
-const u16 = (b, i) => b[i] | (b[i + 1] << 8);
-const BUTTON = { 0: "none", 1: "press", 2: "double_press", 3: "triple_press", 4: "long_press",
-                 5: "long_double_press", 6: "long_triple_press", 0x80: "hold_press" };
-
-export const OBJECTS = {
-  0x00: ["packet_id", 2, (b, i) => b[i]],
-  0x01: ["battery%", 2, (b, i) => b[i]],
-  0x02: ["temperature", 3, (b, i) => s16(b, i) / 100],
-  0x09: ["count/mode", 2, (b, i) => b[i]],
-  0x0c: ["voltage", 3, (b, i) => u16(b, i) / 1000],
-  0x0f: ["boost/generic", 2, (b, i) => !!b[i]],
-  0x10: ["power", 2, (b, i) => !!b[i]],
-  0x15: ["battery_low", 2, (b, i) => !!b[i]],
-  0x1b: ["garage_door", 2, (b, i) => !!b[i]],
-  0x1f: ["lock", 2, (b, i) => !b[i]],            // 1 = unlocked, so the FLAG is "locked"
-  0x26: ["problem", 2, (b, i) => !!b[i]],
-  0x27: ["running", 2, (b, i) => !!b[i]],
-  0x2d: ["window", 2, (b, i) => !!b[i]],         // 1 = open
-  0x2f: ["moisture/valve", 2, (b, i) => b[i]],
-  0x3a: ["button_event", 2, (b, i) => BUTTON[b[i]] ?? b[i]],
-  0x3c: ["dimmer_event", 3, (b, i) => `${{ 0: "none", 1: "rotate_left", 2: "rotate_right" }[b[i]] ?? b[i]} x${b[i + 1]}`],
-  0x3d: ["count16", 3, (b, i) => u16(b, i)],
+// THE TABLE IS HOME ASSISTANT'S, generated into `bthome_objects.js` from the `bthome-ble` library
+// (webapp/tools/gen_bthome_objects.py), so every id is walked, named and scaled the way Home Assistant
+// does it. The Python decoder (ble_chip/tools/scan_bthome.py) reads the same file. The names are the
+// sensor's device class -- `count`, `generic`, `moisture`, `lock` -- and what THIS device puts in an
+// object (0x09 is the mode, 0x2F the valve) is a label above the decoder, in readings.ts.
+// `lock` is BTHome's binary sensor: true = UNLOCKED, as in Home Assistant.
+const T = BTHOME_OBJECTS;
+const leInt = (b, i, n, signed) => {
+  let v = 0;
+  for (let k = n - 1; k >= 0; k--) v = v * 256 + b[i + k];
+  return signed && n > 0 && b[i + n - 1] & 0x80 ? v - 2 ** (8 * n) : v;
 };
+const hexOf = (b) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+
+/** One object's value from its data bytes `d`, per its table entry `o`. */
+function valueOf(o, d) {
+  switch (o.kind) {
+    case "binary": return d[0] !== 0;
+    case "text": return new TextDecoder().decode(d);
+    case "raw": return hexOf(d);
+    case "timestamp": return leInt(d, 0, d.length, false);
+    case "info":
+      return o.name === "firmware_version" ? [...d].reverse().join(".") : leInt(d, 0, d.length, false);
+    case "event":
+      if (o.name === "button") return T.events.button[d[0]] ?? "none";
+      if (o.name === "dimmer") return `${T.events.dimmer[d[0]] ?? "none"} x${d[1]}`;
+      return hexOf(d);                                   // command: opcode + args, as HA shows them
+    default: {
+      const v = leInt(d, 0, d.length, o.signed) * o.factor;
+      return Math.round(v * 1e6) / 1e6;                  // 2071 * 0.01 is 20.71, not 20.710000000000001
+    }
+  }
+}
 
 /** Decode a plaintext object run. Returns the objects in WIRE ORDER as well as by name.
  *
@@ -146,20 +152,27 @@ export const OBJECTS = {
  *  indexes by id alone gets one of them at random. `list` preserves the wire order; `values` gives
  *  the first occurrence its plain name and any repeat a `#2` suffix, so neither is silently lost.
  *
- *  An UNKNOWN id stops the walk rather than being skipped: the table is what gives each object its
- *  length, so guessing past one would reinterpret every following byte as a different field. */
+ *  An UNKNOWN id stops the walk rather than being skipped, as Home Assistant's parser does: the
+ *  table is what gives each object its length, so guessing past one would reinterpret every
+ *  following byte. Text, raw and command objects carry their own length byte after the id. */
 export function decodeObjects(plain) {
   const values = {}; const list = []; const unknown = [];
   let i = 0;
   while (i < plain.length) {
-    const spec = OBJECTS[plain[i]];
-    if (!spec) { unknown.push(plain[i]); break; }
-    const [name, len, fn] = spec;
-    if (i + len > plain.length) { unknown.push(plain[i]); break; }
-    const v = fn(plain, i + 1);
-    list.push({ id: plain[i], name, value: v });
-    values[name in values ? name + " #2" : name] = v;
-    i += len;
+    const id = plain[i];
+    const o = T.objects["0x" + id.toString(16).padStart(2, "0")];
+    if (!o) { unknown.push(id); break; }
+    let start = i + 1, len = o.len;
+    if (len === null) {                                  // a length byte follows the id
+      if (start >= plain.length) { unknown.push(id); break; }
+      len = o.name === "command" ? 1 + (plain[start] & 0x1f) : plain[start];
+      start += 1;
+    }
+    if (start + len > plain.length) { unknown.push(id); break; }
+    const v = valueOf(o, plain.slice(start, start + len));
+    list.push({ id, name: o.name, value: v });
+    values[o.name in values ? o.name + " #2" : o.name] = v;
+    i = start + len;
   }
   return { values, list, unknown };
 }

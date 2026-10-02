@@ -29,8 +29,8 @@
       },
       "radio": {
         "file": "radio-2.01.bin",
-        "bytes": 27968,
-        "sha256": "dcfa056a24933ce942fa67a34aff6f602d962651209c52e7b45c67d4989e24b9",
+        "bytes": 27984,
+        "sha256": "5a93fc024281db75189dac2ff4bcbf9ffa2d136f056bed0fb21a93a4048e3c8f",
         "expect": "5.1"
       }
     },

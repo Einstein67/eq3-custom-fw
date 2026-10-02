@@ -26,6 +26,9 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The broadcast interval you picked survives a radio update.** The radio used to forget it and fall
   back to about one second until the thermostat itself restarted, which could take weeks; it now
   remembers the choice and puts it back when it starts.
+- **The broadcast says whether something is connected to the thermostat.** Home Assistant shows it as
+  a "connectivity" sensor. The thermostat takes one connection at a time, so this is what tells you
+  it is already taken, most often by Home Assistant itself.
 - **Home Assistant can pair through an ESPHome Bluetooth proxy with the pairing PIN on.** The thermostat
   now asks to be paired when something touches a PIN-locked part, which a proxy needs before it pairs;
   `PROTOCOL.md` has the proxy setting. On Android, the PIN prompt is now preceded by a "pair?"
@@ -40,6 +43,10 @@ Built on 2.00. Both the radio and the thermostat change.
 
 **In the app and the tools:**
 
+- **The app reads the broadcast the way Home Assistant does.** It knows every BTHome object, with
+  Home Assistant's names and scaling, so a new object no longer hides the ones after it.
+  Update the app before the thermostat's radio: an older app loses the lock and window readings
+  from a 2.01 radio.
 - **A connect that fails is retried** for the whole time the app is looking for the thermostat,
   instead of giving up after the first refusal.
 - **A thermostat the app can hear but not open is probably held by something else**, most often Home

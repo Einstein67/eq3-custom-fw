@@ -1,15 +1,15 @@
 /**
  * Every value the broadcast carries, in words — the one place that names them for a person.
  *
- * THE DECODER'S NAMES ARE WIRE NAMES AND NOT LABELS. `moisture/valve`, `boost/generic` and
- * `count/mode` say which BThome object id a reading arrived under, which is what `bthome.js` is
- * for and what a bug report needs; `valve`, `boost` and `mode` are what somebody reading their
- * radiator wants. Booleans are the same problem twice over — `true` under `window` is not an
- * answer, `open` is.
+ * THE DECODER'S NAMES ARE HOME ASSISTANT'S AND NOT LABELS. `moisture`, `generic` and `count` are
+ * the BTHome device classes a reading arrived under (`bthome_objects.js`), which is what a bug report
+ * and a Home Assistant entity share; `valve`, `boost` and `mode` are what this thermostat puts in
+ * them and what somebody reading their radiator wants. Booleans are the same problem twice over —
+ * `true` under `window` is not an answer, `open` is, and `true` under `lock` means UNLOCKED.
  *
  * **IT IS SHARED BECAUSE TWO VIEWS SHOW THE SAME FIELDS**: the saved list, where every row is a
  * thermostat nothing is connected to, and the Status tab. Two renderings of one payload let a field
- * read `boost/generic true` in one and `Boost on` in the other.
+ * read `generic true` in one and `Boost on` in the other.
  *
  * **AN UNKNOWN OBJECT IS SHOWN, NEVER DROPPED.** A reading this table has no row for still appears,
  * under its wire name — because the alternative is a value the device is airing and the app hides,
@@ -45,23 +45,23 @@ const SPECS: Record<string, Spec> = {
   // the same number the same way instead of a person having to work out that they match.
   temperature: { label: 'current', fmt: (v) => `${(v as number).toFixed(1)}°` },
   'temperature #2': { label: 'target', fmt: (v) => `${(v as number).toFixed(1)}°` },
-  'moisture/valve': { label: 'valve', fmt: (v) => `${v as number}%` },
+  moisture: { label: 'valve', fmt: (v) => `${v as number}%` },
   voltage: { label: 'battery', fmt: (v) => `${(v as number).toFixed(2)} V` },
-  'battery%': { label: 'battery level', fmt: (v) => `${v as number}%` },
+  battery: { label: 'battery level', fmt: (v) => `${v as number}%` },
   battery_low: { label: 'battery', fmt: (v) => (v ? 'LOW' : 'ok'), quiet: (v) => !v },
   window: { label: 'window', fmt: (v) => (v ? 'open' : 'closed') },
-  lock: { label: 'buttons', fmt: (v) => (v ? 'locked' : 'unlocked') },
-  'boost/generic': { label: 'boost', fmt: (v) => (v ? 'on' : 'off') },
-  power: { label: 'power', fmt: (v) => (v ? 'on' : 'off') },
+  // BTHome's lock, as Home Assistant reads it: true = UNLOCKED.
+  lock: { label: 'buttons', fmt: (v) => (v ? 'unlocked' : 'locked') },
+  generic: { label: 'boost', fmt: (v) => (v ? 'on' : 'off') },
+  power_detected: { label: 'power', fmt: (v) => (v ? 'on' : 'off') },
   running: { label: 'running', fmt: (v) => (v ? 'yes' : 'no') },
   problem: { label: 'problem', fmt: (v) => (v ? 'yes' : 'none'), quiet: (v) => !v },
   garage_door: { label: 'garage door', fmt: (v) => (v ? 'open' : 'closed') },
-  // The wire name says `count` because that is the BThome object the radio chip borrows; the value
-  // is the thermostat's mode, and it is the same two bits the status reply carries.
-  'count/mode': { label: 'mode', fmt: (v) => MODES[v as number] ?? String(v) },
-  count16: { label: 'count', fmt: (v) => String(v) },
-  button_event: { label: 'button', fmt: (v) => String(v) },
-  dimmer_event: { label: 'dimmer', fmt: (v) => String(v) },
+  // The device class is `count` because that is the BTHome object the radio borrows; the value is
+  // the thermostat's mode, and it is the same two bits the status reply carries.
+  count: { label: 'mode', fmt: (v) => MODES[v as number] ?? String(v) },
+  button: { label: 'button', fmt: (v) => String(v) },
+  dimmer: { label: 'dimmer', fmt: (v) => String(v) },
   packet_id: { label: 'packet', fmt: (v) => String(v) },
 }
 
@@ -102,8 +102,8 @@ const unknownOf = (values: Record<string, BthomeValue>): Reading[] =>
  * table grows from four rows to nine while somebody is looking at it.
  */
 export const BROADCAST_SETS: string[][] = [
-  ['temperature', 'temperature #2', 'moisture/valve', 'voltage'],
-  ['window', 'lock', 'boost/generic', 'battery_low', 'count/mode'],
+  ['temperature', 'temperature #2', 'moisture', 'voltage'],
+  ['window', 'lock', 'generic', 'battery_low', 'count'],
 ]
 
 /** Both sets, flat — for a view that does not care which advert a reading came in. */

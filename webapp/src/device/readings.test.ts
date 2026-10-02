@@ -19,7 +19,7 @@ test('a real set-0 payload reads as measurements, not as wire names', () => {
   expect(describeValues(values)).toEqual([
     { key: 'temperature', label: 'current', text: '29.7°' },
     { key: 'temperature #2', label: 'target', text: '14.0°' },
-    { key: 'moisture/valve', label: 'valve', text: '0%' },
+    { key: 'moisture', label: 'valve', text: '0%' },
     { key: 'voltage', label: 'battery', text: '3.29 V' },
   ])
 })
