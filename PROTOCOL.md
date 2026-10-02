@@ -200,6 +200,32 @@ central** — reads, writes and notifications alike. The PIN is shown on the the
 The encrypted pair above is deliberately *not* gated: the encryption key is what lets you in. That is how
 a client gets back into a thermostat whose PIN it does not know.
 
+**From 2.01 the thermostat also asks to be paired** when an unpaired client touches a PIN-locked
+characteristic: it refuses the access as before, and then sends Bluetooth's own pairing request.
+Phones and computers start pairing on the refusal anyway; an **ESPHome Bluetooth proxy** does not,
+and pairs only when asked. A client that uses only the encrypted pair never touches a locked
+characteristic, so it is never asked. On Android the PIN prompt is now preceded by a "pair with
+this device?" confirmation.
+
+**Home Assistant through an ESPHome proxy, with the PIN on:** give the proxy a `ble_client` for the
+thermostat that only answers the PIN request, next to `bluetooth_proxy`. `auto_connect: false`
+matters: the thermostat takes one connection at a time, and Home Assistant's must be the one.
+
+```yaml
+esp32_ble:
+  io_capability: keyboard_only
+
+ble_client:
+  - mac_address: 00:1A:22:xx:xx:xx   # the thermostat
+    id: eq3_pin
+    auto_connect: false
+    on_passkey_request:
+      then:
+        - ble_client.passkey_reply:
+            id: eq3_pin
+            passkey: 123456           # the PIN
+```
+
 ### Writing a command
 
 Write the command bytes to the command characteristic. That is all — no length byte, no checksum, no

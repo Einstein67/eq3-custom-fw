@@ -27,6 +27,10 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The broadcast interval you picked survives a radio update.** The radio used to forget it and fall
   back to about one second until the thermostat itself restarted, which could take weeks; it now
   remembers the choice and puts it back when it starts.
+- **Home Assistant can pair through an ESPHome Bluetooth proxy with the pairing PIN on.** The thermostat
+  now asks to be paired when something touches a PIN-locked part, which a proxy needs before it pairs;
+  `PROTOCOL.md` has the proxy setting. On Android, the PIN prompt is now preceded by a "pair?"
+  confirmation.
 - **The app's weekly programme shows only the switch points the thermostat runs.** A programme
   written by Home Assistant showed extra rows at 00:00 and an error, and copying a day spread them to
   every other day. A time can no longer be set earlier than the row above it or later than the row
