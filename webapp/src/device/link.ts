@@ -2098,7 +2098,11 @@ function complainOnce(l: Link, key: string, message: string) {
  * that has just been authenticated.
  */
 async function subscribeReplies(l: Link, io: Io): Promise<boolean> {
-  if (!l.notifyCh) return false
+  if (!l.notifyCh) {
+    complainOnce(l, 'subscribe: no characteristic',
+      "subscribing to the thermostat's replies failed: this connection never found the reply characteristic")
+    return false
+  }
   try {
     await io.subscribe(l.notifyCh)
     // Removed first, because this can run twice: a listener added twice delivers every frame twice,
@@ -2107,7 +2111,11 @@ async function subscribeReplies(l: Link, io: Io): Promise<boolean> {
     l.notifyCh.addEventListener('characteristicvaluechanged', l.onNotify)
     jotai.set(repliesFor(l.id), true)
     return true
-  } catch {
+  } catch (e) {
+    // THE REASON IS LOGGED, ONCE PER DISTINCT TEXT. A pairing refusal is one cause among several, and
+    // the install sheet's "pair first" was once shown for a thermostat that needs no pairing at all,
+    // with nothing on record to say what the browser had actually answered.
+    complainOnce(l, `subscribe: ${why(e)}`, `subscribing to the thermostat's replies failed: ${why(e)}`)
     // IT REPORTS, IT DOES NOT PUBLISH A VERDICT. Succeeding always means replies arrive, so the
     // `true` above is safe from any caller — but FAILING means different things depending on who
     // asked, and only the connect path knows. Two of the three callers use this as a PAIRING PROBE

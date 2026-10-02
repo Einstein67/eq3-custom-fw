@@ -165,14 +165,19 @@ export function pairing(fw: number | null, chip: ChipVersion | null): Pairing {
  * single reply. Our radio firmware moves it adjacent and fixes exactly that. It is the one failure
  * here with something a person can do about it, which is why it gets a sentence instead of silence.
  *
+ * **THE FIX CANNOT BE INSTALLED FROM THE MAC ITSELF** `[owner]` `[manually verified]`. An install
+ * subscribes to that same descriptor before it writes a byte (`prepareForFlash`), so on a Mac it
+ * stops at that step with the radio untouched. The way out is another host, which is what this says.
+ * Shown by `NotAnswering` and by the install sheet, one text for both.
+ *
  * It cannot be about iPhones: Web Bluetooth ships in Chrome and Edge only, and on iOS every browser
  * is Safari underneath, so this app does not run there at all and the message is unreachable.
  * Writing it as an iOS fix would be promising something no firmware of ours can deliver.
  */
 export const MAC_NOTIFY_HINT =
-  'This Mac cannot hear the thermostat answer, because its radio still runs the original ' +
-  'firmware — macOS refuses to subscribe to it. Install our radio firmware from the Install tab ' +
-  'and replies work. Sending commands already works; only the answers are missing.'
+  'This Mac cannot talk to this thermostat: its radio still runs the original firmware, and ' +
+  'macOS will not take that radio’s answers. Install 2.00 or newer from an Android phone or a ' +
+  'Linux computer — after that, this Mac works with it too.'
 
 /** True on an Apple desktop, which is the only platform the message above applies to. */
 export function isMac(): boolean {

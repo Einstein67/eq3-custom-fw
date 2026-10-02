@@ -23,6 +23,7 @@ import {
   unhexPayload,
   type Chip,
 } from '@/device/flash'
+import { MAC_NOTIFY_HINT, isMac } from '@/device/caps'
 import { STAY_PUT, useFlashGuards } from '@/device/flashGuards'
 import {
   radioFlashableAtom,
@@ -276,6 +277,10 @@ export function FirmwareInstall() {
     const ready = await prepareForFlash()
     const fail = (error: string) => setJob((r) => (r ? { ...r, phase: 'error', error } : r))
     if (!ready.paired) {
+      // ON A MAC THIS IS THE STOCK RADIO, NOT PAIRING — the same refused subscribe `NotAnswering`
+      // explains, and a Mac cannot answer a pairing request anyway. The pairing text below sent a
+      // person on a Mac looking for a code their thermostat would never ask for.
+      if (isMac()) return fail(MAC_NOTIFY_HINT)
       return fail(
         'this thermostat wants to be paired with before it will accept an update, and that has not ' +
           'happened yet. Answer the pairing request on your phone — the code is on the thermostat’s ' +
