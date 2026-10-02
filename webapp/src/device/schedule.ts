@@ -21,8 +21,22 @@
  * saves typing, not because a command exists behind it. `plan()` below is where the wire shape
  * lives, and it is the only place that knows about groups at all.
  *
+ * ================================================================================================
+ * AN INVALID DAY CANNOT BE HELD `[owner]`
+ * ================================================================================================
  * **THE FIRMWARE VALIDATES NOTHING** `[binary]` — `ble_cmd_10_set_program` masks the temperatures
- * and copies the time bytes through untouched — so every constraint is this file's.
+ * and copies the time bytes through untouched — so the model carries the constraints itself rather
+ * than checking for them afterwards:
+ * - **The last period has no time.** It always runs to 24:00, so a `Day` stores only its
+ *   temperature. A seven-slot frame stores a time there anyway, and an editor that kept it held a
+ *   value it showed as a fixed "24:00" and could not reach — a user's day read `20:00` then `24:00`
+ *   and still failed ordering (eq3-custom-fw issue #4) `[manually verified]`, after they deleted
+ *   the rows the Home Assistant integration's padding had shown (see `fromWire`).
+ * - **The times only go forward.** Every edit goes through `setUntil`, `addSlot` or `removeSlot`,
+ *   which keep them strictly increasing and on the ten-minute grid; the editor holds a time between
+ *   its neighbours rather than reporting a backwards one `[owner]`.
+ * - **Anything arriving from outside is settled into that shape** (`fromWire`), which is where the
+ *   rules meet data the editor did not make: a device day, a saved programme.
  *
  * ================================================================================================
  * DAY 0 IS SATURDAY
@@ -32,21 +46,30 @@
  * is shown Monday first; only this file knows the device's order.
  */
 
-/** One switch point: everything up to `until` is heated to `temp`. */
+import { TEMP_MAX, TEMP_MIN, tempByte } from './commands'
+
+/** One switch point on the wire: everything up to `until` is heated to `temp`. */
 export type Slot = {
-  /** Minutes from midnight, a multiple of 10, 0…1440. 1440 is the end of the day. */
+  /** Minutes from midnight, a multiple of 10. 1440 is the end of the day. */
   until: number
   /** Degrees C, on the half-degree grid. */
   temp: number
 }
 
-/** Exactly seven slots, always — see the header. */
-export type Day = Slot[]
+/**
+ * One day as the editor holds it: the switch points before midnight, then the temperature that
+ * runs from the last of them to 24:00. `slots` times are strictly increasing, on the ten-minute
+ * grid, between 00:10 and 23:50 — see the header for who keeps them that way.
+ */
+export type Day = { slots: Slot[]; last: number }
 /** Seven days, indexed the DEVICE's way: 0 = Saturday. */
 export type Week = Day[]
 
 export const SLOTS = 7
+/** The frame's seventh slot is always the period that ends at midnight. */
+export const MAX_CHANGES = SLOTS - 1
 export const END_OF_DAY = 1440
+const STEP = 10
 
 /** Device weekday → what a person calls it. Index is the device's, order is not. */
 export const DAY_NAMES = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -72,64 +95,102 @@ export const isDayReply = (b: Uint8Array) => b.length >= 16 && b[0] === 0x21
 
 export function decodeDay(b: Uint8Array): Day | null {
   if (!isDayReply(b)) return null
-  const day: Day = []
+  const slots: Slot[] = []
   for (let i = 0; i < SLOTS; i++) {
-    day.push({ temp: b[2 + i * 2]! / 2, until: b[3 + i * 2]! * 10 })
+    slots.push({ temp: b[2 + i * 2]! / 2, until: b[3 + i * 2]! * 10 })
   }
-  return day
+  return fromWire(slots)
 }
 
-/** `cmd 0x10 <day or group> <temp,time> × 7`. The day is padded to seven slots first. */
+/**
+ * Seven slots from outside the editor → a `Day`.
+ *
+ * The day ends at the first 24:00, because `state_refresh` stops scanning there `[binary]`: what
+ * follows is never run. The Home Assistant integration fills that space with junk — its
+ * `set_schedule` writes every unused time as `00:00` and turns only the FIRST into 24:00, so the
+ * slots after the end read `00:00` at 0 °C, and the seventh is whatever `HA1` leaves there
+ * `[external]`.
+ *
+ * A slot that does not move forward also ends the day, and its temperature becomes `last`. That
+ * shape comes from saved programmes: an older editor stored the rows it showed, and the last row's
+ * time was hidden behind its fixed "24:00" label, so it could hold anything — issue #4's day was
+ * `20:00`, then `11.5 °C` behind the label with a time at or before 20:00 `[manually verified]`.
+ * Temperatures are clamped into the device's range, since a stray byte can hold anything.
+ */
+export function fromWire(wire: Slot[]): Day {
+  const temp = (t: number) => tempByte(t) / 2
+  const slots: Slot[] = []
+  for (const s of wire.slice(0, SLOTS)) {
+    const prev = slots[slots.length - 1]?.until ?? 0
+    if (s.until >= END_OF_DAY || s.until <= prev || s.until % STEP !== 0 || slots.length === MAX_CHANGES)
+      return { slots, last: temp(s.temp) }
+    slots.push({ until: s.until, temp: temp(s.temp) })
+  }
+  // Fewer than seven and no end: a saved programme holds the rows a person saw, so its final row
+  // is the period that runs to midnight.
+  const end = slots.pop()
+  return { slots, last: end?.temp ?? temp(TEMP_MIN) }
+}
+
+/** The seven slots the frame carries: the changes, then the last period repeated at 24:00. */
+export function toWire(day: Day): Slot[] {
+  const out = day.slots.map((s) => ({ ...s }))
+  while (out.length < SLOTS) out.push({ until: END_OF_DAY, temp: day.last })
+  return out
+}
+
+/** `cmd 0x10 <day or group> <temp,time> × 7`. */
 export function writeDay(dayOrGroup: number, day: Day): number[] {
-  const full = pad(day)
   const out = [0x10, dayOrGroup]
-  for (const s of full) out.push(Math.round(s.temp * 2), Math.round(s.until / 10))
+  for (const s of toWire(day)) out.push(tempByte(s.temp), Math.round(s.until / 10))
   return out
 }
 
 /** The device acks a programme write with its own frame, `02 02 …`. */
 export const isProgramAck = (b: Uint8Array) => b.length >= 2 && b[0] === 0x02 && b[1] === 0x02
 
-/* ---- the model ------------------------------------------------------------------------------ */
+/* ---- the model: every edit keeps the day valid ----------------------------------------------- */
 
-/**
- * Pad a short day out to seven slots by repeating the last temperature at the end of the day.
- * NEVER send fewer — see the header for what the device does with the slots you leave out.
- */
-export function pad(day: Day): Day {
-  const real = day.slice(0, SLOTS)
-  const last = real[real.length - 1] ?? { until: END_OF_DAY, temp: 17 }
-  while (real.length < SLOTS) real.push({ until: END_OF_DAY, temp: last.temp })
-  real[SLOTS - 1] = { ...real[SLOTS - 1]!, until: END_OF_DAY }
-  return real
+/** The range switch point `i` may take: after the one before it, before the one after it. */
+export function untilRange(day: Day, i: number): [number, number] {
+  const lo = (day.slots[i - 1]?.until ?? 0) + STEP
+  const hi = (day.slots[i + 1]?.until ?? END_OF_DAY) - STEP
+  return [lo, hi]
 }
 
-/** The slots a person edits: the padding at the end is not a switch point they put there. */
-export function trim(day: Day): Day {
-  const out = [...day]
-  while (out.length > 1 && out[out.length - 2]!.until >= END_OF_DAY) out.pop()
-  return out
+/** Move switch point `i`, held between its neighbours and snapped to the ten-minute grid. */
+export function setUntil(day: Day, i: number, until: number): Day {
+  const [lo, hi] = untilRange(day, i)
+  const t = Math.min(hi, Math.max(lo, Math.round(until / STEP) * STEP))
+  return { ...day, slots: day.slots.map((s, j) => (j === i ? { ...s, until: t } : s)) }
 }
 
-/** What is wrong with this day, in words, or null. The firmware checks none of it. */
-export function problem(day: Day): string | null {
-  const full = pad(day)
-  let prev = 0
-  for (const s of full) {
-    if (s.until <= prev && s.until !== END_OF_DAY) return 'the times must go forwards'
-    if (s.until % 10 !== 0) return 'times move in ten-minute steps'
-    if (s.temp < 4.5 || s.temp > 30) return 'temperatures run from 4.5 to 30 °C'
-    if (Math.round(s.temp * 2) !== s.temp * 2) return 'temperatures move in half degrees'
-    prev = s.until
-  }
-  if (full[SLOTS - 1]!.until !== END_OF_DAY) return 'the last period must run to midnight'
-  return null
+/** Set the temperature of period `i`; `i === slots.length` is the one that runs to midnight. */
+export function setTemp(day: Day, i: number, temp: number): Day {
+  const t = Math.min(TEMP_MAX, Math.max(TEMP_MIN, temp))
+  if (i === day.slots.length) return { ...day, last: t }
+  return { ...day, slots: day.slots.map((s, j) => (j === i ? { ...s, temp: t } : s)) }
 }
 
-const sameDay = (a: Day, b: Day) => {
-  const [x, y] = [pad(a), pad(b)]
-  return x.every((s, i) => s.temp === y[i]!.temp && s.until === y[i]!.until)
+/** The room a new switch point needs: a free ten-minute step between the last one and midnight. */
+export const canAdd = (day: Day) =>
+  day.slots.length < MAX_CHANGES && (day.slots[day.slots.length - 1]?.until ?? 0) + STEP < END_OF_DAY
+
+/** A new switch point halfway through the last period, at that period's temperature. */
+export function addSlot(day: Day): Day {
+  if (!canAdd(day)) return day
+  const prev = day.slots[day.slots.length - 1]?.until ?? 0
+  const until = Math.min(END_OF_DAY - STEP, prev + Math.max(STEP, Math.round((END_OF_DAY - prev) / 2 / STEP) * STEP))
+  return { ...day, slots: [...day.slots, { until, temp: day.last }] }
 }
+
+/** Remove switch point `i`: its period is absorbed by the one after it. */
+export const removeSlot = (day: Day, i: number): Day => ({ ...day, slots: day.slots.filter((_, j) => j !== i) })
+
+const sameDay = (a: Day, b: Day) =>
+  a.last === b.last &&
+  a.slots.length === b.slots.length &&
+  a.slots.every((s, i) => s.temp === b.slots[i]!.temp && s.until === b.slots[i]!.until)
 
 const allSame = (week: Week, days: number[]) =>
   days.every((d) => sameDay(week[days[0]!]!, week[d]!))
@@ -139,13 +200,13 @@ const allSame = (week: Week, days: number[]) =>
  * weekdays-equal is two; anything else falls back to one per day. The person sees "sent", not a
  * strategy.
  */
-export function plan(week: Week): { day: number; slots: Day }[] {
-  if (allSame(week, EVERY_DAY)) return [{ day: GROUP_ALL, slots: week[0]! }]
-  const out: { day: number; slots: Day }[] = []
-  if (allSame(week, WEEKEND)) out.push({ day: GROUP_WEEKEND, slots: week[0]! })
-  else for (const d of WEEKEND) out.push({ day: d, slots: week[d]! })
-  if (allSame(week, WEEKDAYS)) out.push({ day: GROUP_WEEKDAYS, slots: week[2]! })
-  else for (const d of WEEKDAYS) out.push({ day: d, slots: week[d]! })
+export function plan(week: Week): { day: number; program: Day }[] {
+  if (allSame(week, EVERY_DAY)) return [{ day: GROUP_ALL, program: week[0]! }]
+  const out: { day: number; program: Day }[] = []
+  if (allSame(week, WEEKEND)) out.push({ day: GROUP_WEEKEND, program: week[0]! })
+  else for (const d of WEEKEND) out.push({ day: d, program: week[d]! })
+  if (allSame(week, WEEKDAYS)) out.push({ day: GROUP_WEEKDAYS, program: week[2]! })
+  else for (const d of WEEKDAYS) out.push({ day: d, program: week[d]! })
   return out
 }
 
@@ -156,17 +217,19 @@ export const hhmm = (mins: number) =>
 
 /** Copy one day onto others. A local operation with no command behind it — see the header. */
 export function copyDay(week: Week, from: number, to: number[]): Week {
-  return week.map((d, i) => (to.includes(i) ? pad(week[from]!).map((s) => ({ ...s })) : d))
+  return week.map((d, i) => (to.includes(i) ? { ...week[from]!, slots: week[from]!.slots.map((s) => ({ ...s })) } : d))
 }
 
 /** A week where every day is the thermostat's own first-run programme, for a preset to start from. */
 export function defaultWeek(): Week {
-  const day: Day = [
-    { until: 360, temp: 17 },
-    { until: 540, temp: 21 },
-    { until: 1020, temp: 17 },
-    { until: 1380, temp: 21 },
-    { until: END_OF_DAY, temp: 17 },
-  ]
-  return Array.from({ length: 7 }, () => day.map((s) => ({ ...s })))
+  const day = (): Day => ({
+    slots: [
+      { until: 360, temp: 17 },
+      { until: 540, temp: 21 },
+      { until: 1020, temp: 17 },
+      { until: 1380, temp: 21 },
+    ],
+    last: 17,
+  })
+  return Array.from({ length: 7 }, day)
 }

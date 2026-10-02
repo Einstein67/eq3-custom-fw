@@ -8,29 +8,35 @@ import { request } from '@/device/link'
 import {
   DAY_NAMES,
   DISPLAY_ORDER,
-  END_OF_DAY,
   EVERY_DAY,
+  MAX_CHANGES,
   WEEKDAYS,
   WEEKEND,
   GROUP_ALL,
   GROUP_WEEKDAYS,
   GROUP_WEEKEND,
+  addSlot,
+  canAdd,
+  copyDay,
   decodeDay,
   defaultWeek,
+  fromWire,
   hhmm,
   isDayReply,
   isProgramAck,
-  pad,
   plan,
-  problem,
   readDay,
-  trim,
+  removeSlot,
+  setTemp,
+  setUntil,
+  toWire,
+  untilRange,
   writeDay,
   type Day,
   type Week,
 } from '@/device/schedule'
 import { registryPresetsAtom } from '@/state/atoms'
-import { registry } from '@/state/registry'
+import { registry, type Preset } from '@/state/registry'
 
 import { Sheet } from './Sheet'
 import { Button } from './ui/button'
@@ -104,7 +110,7 @@ export function ScheduleSheet({ onClose }: { onClose: () => void }) {
     const commands = plan(week)
     setBusy(`Sending ${commands.length} command${commands.length === 1 ? '' : 's'}…`)
     for (const c of commands) {
-      const r = await request(writeDay(c.day, c.slots), isProgramAck)
+      const r = await request(writeDay(c.day, c.program), isProgramAck)
       if (!r) {
         setBusy(null)
         log('the thermostat did not acknowledge the programme — nothing else was sent')
@@ -117,16 +123,12 @@ export function ScheduleSheet({ onClose }: { onClose: () => void }) {
     void load()
   }
 
-  const edit = (slots: Day) => {
+  const edit = (next: Day) => {
     setSent(false)
-    setWeek((w) => (w ? w.map((d, i) => (i === day ? slots : d)) : w))
+    setWeek((w) => (w ? w.map((d, i) => (i === day ? next : d)) : w))
   }
 
-  const copyTo = (targets: number[]) =>
-    setWeek((w) => (w ? w.map((d, i) => (targets.includes(i) ? pad(w[day]!).map((s) => ({ ...s })) : d)) : w))
-
-  const slots = week ? trim(week[day]!) : []
-  const issue = week ? problem(week[day]!) : null
+  const copyTo = (targets: number[]) => setWeek((w) => (w ? copyDay(w, day, targets) : w))
 
   return (
     <Sheet title="Weekly programme" onClose={onClose}>
@@ -170,9 +172,7 @@ export function ScheduleSheet({ onClose }: { onClose: () => void }) {
             ))}
           </ToggleGroup>
 
-          <DayEditor slots={slots} onChange={edit} />
-
-          {issue && <p className="text-sm text-destructive">{issue}</p>}
+          <DayEditor day={week[day]!} onChange={edit} />
 
           <CopyPanel
             source={day}
@@ -190,7 +190,7 @@ export function ScheduleSheet({ onClose }: { onClose: () => void }) {
             <Button
               size="lg"
               className="w-full"
-              disabled={!!busy || !!issue}
+              disabled={!!busy}
               onClick={() => void send()}
             >
               Send to the thermostat
@@ -223,73 +223,78 @@ function sendSummary(week: Week): string {
 /**
  * One day's switch points.
  *
- * A ROW IS "UNTIL <time>, HEAT TO <temp>", which is what the device stores — not "from…to", which
- * would need two numbers per row and let a person leave a gap the format cannot express. The last
- * row always runs to midnight and its time is therefore fixed rather than editable.
+ * A ROW READS "<temp> UNTIL <time>" `[owner]`, which is what the device stores — not "from…to",
+ * which would need two numbers per row and let a person leave a gap the format cannot express. The
+ * last row always runs to midnight and its time is therefore fixed rather than editable.
  */
-function DayEditor({ slots, onChange }: { slots: Day; onChange: (d: Day) => void }) {
-  const set = (i: number, patch: Partial<Day[number]>) =>
-    onChange(slots.map((s, j) => (i === j ? { ...s, ...patch } : s)))
-
-  const add = () => {
-    if (slots.length >= 7) return
-    const prev = slots[slots.length - 2]?.until ?? 0
-    const gap = Math.max(10, Math.round((END_OF_DAY - prev) / 2 / 10) * 10)
-    const next = [...slots]
-    next.splice(slots.length - 1, 0, { until: prev + gap, temp: slots[slots.length - 1]!.temp })
-    onChange(next)
-  }
+function DayEditor({ day, onChange }: { day: Day; onChange: (d: Day) => void }) {
+  // The switch points, then the period that runs to midnight, which has no time of its own.
+  const rows = [...day.slots, { until: null, temp: day.last }]
 
   return (
     <div className="space-y-2">
-      {slots.map((s, i) => (
+      {rows.map((s, i) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="w-10 shrink-0 text-xs text-muted-foreground">until</span>
-          {i === slots.length - 1 ? (
-            <span className="w-24 shrink-0 py-2 text-sm tabular-nums text-muted-foreground">24:00</span>
-          ) : (
-            <Input
-              type="time"
-              step={600}
-              value={hhmm(s.until)}
-              onChange={(e) => {
-                const [h, m] = e.target.value.split(':').map(Number)
-                set(i, { until: (h ?? 0) * 60 + (m ?? 0) })
-              }}
-              className="w-24 shrink-0 tabular-nums"
-            />
-          )}
           <Slider
             min={TEMP_MIN}
             max={TEMP_MAX}
             step={TEMP_STEP}
             value={[s.temp]}
-            onValueChange={([v]) => set(i, { temp: v! })}
+            onValueChange={([v]) => onChange(setTemp(day, i, v!))}
             aria-label="Temperature"
             className="min-w-0 flex-1 py-4"
           />
-          <span className="w-14 shrink-0 text-right text-sm tabular-nums">{tempText(s.temp)}</span>
+          <span className="w-9 shrink-0 text-right text-sm tabular-nums">{tempText(s.temp)}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">until</span>
+          {s.until === null ? (
+            // The input's border and padding, invisible, so "24:00" lines up with the times above.
+            <span className="w-[6.5rem] shrink-0 border border-transparent px-3 py-2 text-sm tabular-nums text-muted-foreground">
+              24:00
+            </span>
+          ) : (
+            <Input
+              type="time"
+              step={600}
+              // A time is held between its neighbours `[owner]`: the picker offers only that range,
+              // and `setUntil` pulls anything typed outside it back in.
+              min={hhmm(untilRange(day, i)[0])}
+              max={hhmm(untilRange(day, i)[1])}
+              value={hhmm(s.until)}
+              onChange={(e) => {
+                // A cleared field is a person mid-edit, not midnight.
+                if (!e.target.value) return
+                const [h, m] = e.target.value.split(':').map(Number)
+                onChange(setUntil(day, i, (h ?? 0) * 60 + (m ?? 0)))
+              }}
+              // Wide enough for "20:00" beside the picker icon Android Chrome draws inside the field.
+              className="w-[6.5rem] shrink-0 tabular-nums"
+            />
+          )}
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             aria-label="Remove this change"
-            disabled={slots.length <= 1 || i === slots.length - 1}
-            onClick={() => onChange(slots.filter((_, j) => j !== i))}
-            className="shrink-0 text-muted-foreground disabled:opacity-30"
+            disabled={s.until === null}
+            onClick={() => onChange(removeSlot(day, i))}
+            // The negative margin cancels the padding around the icon, so the ICON sits one gap
+            // from the time and flush with the row's edge while the tap target stays 36 px.
+            className="-mx-2.5 shrink-0 text-muted-foreground disabled:opacity-30"
           >
             <Trash2 />
           </Button>
         </div>
       ))}
-      <Button
-        variant="ghost"
-        onClick={add}
-        disabled={slots.length >= 7}
-        className="justify-start px-0 font-normal text-muted-foreground disabled:opacity-40"
-      >
-        <Plus /> Add a change
-        {slots.length >= 7 && ' — seven is the most a day can hold'}
-      </Button>
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          onClick={() => onChange(addSlot(day))}
+          disabled={!canAdd(day)}
+          className="px-0 font-normal text-muted-foreground disabled:opacity-40"
+        >
+          <Plus /> Add a change
+          {day.slots.length >= MAX_CHANGES && ' — seven is the most a day can hold'}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -301,7 +306,7 @@ function Presets({
   onLoad,
 }: {
   week: Week
-  presets: { name: string; week: Week }[]
+  presets: Preset[]
   onLoad: (w: Week) => void
 }) {
   const [name, setName] = useState('')
@@ -314,7 +319,7 @@ function Presets({
             <li key={p.name} className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => onLoad(p.week.map((d) => d.map((s) => ({ ...s }))))}
+                onClick={() => onLoad(p.week.map(fromWire))}
                 className="flex-1 justify-start font-normal"
               >
                 {p.name}
@@ -346,7 +351,7 @@ function Presets({
           variant="outline"
           disabled={!name.trim()}
           onClick={() => {
-            registry.savePreset(name.trim(), week)
+            registry.savePreset(name.trim(), week.map(toWire))
             setName('')
           }}
         >

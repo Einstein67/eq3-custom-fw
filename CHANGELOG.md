@@ -27,6 +27,10 @@ Built on 2.00. Both the radio and the thermostat change.
 - **The broadcast interval you picked survives a radio update.** The radio used to forget it and fall
   back to about one second until the thermostat itself restarted, which could take weeks; it now
   remembers the choice and puts it back when it starts.
+- **The app's weekly programme shows only the switch points the thermostat runs.** A programme
+  written by Home Assistant showed extra rows at 00:00 and an error, and copying a day spread them to
+  every other day. A time can no longer be set earlier than the row above it or later than the row
+  below.
 - All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
   bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
 

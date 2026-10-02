@@ -113,7 +113,9 @@ export type Thermostat = {
  * backup that restores the thermostats but not their programmes is half a backup.
  *
  * The week is stored the DEVICE's way round (index 0 = Saturday), because that is the only
- * numbering the wire has; `device/schedule.ts` owns the translation to what a person sees.
+ * numbering the wire has; `device/schedule.ts` owns the translation to what a person sees. Each day
+ * is kept in the wire's shape too (seven `until`/`temp` slots), and `fromWire` settles it on load,
+ * so a file written by an older app still loads.
  */
 export type Preset = { name: string; week: { until: number; temp: number }[][] }
 

@@ -138,6 +138,19 @@ test('copying onto the whole weekend makes the week one command', async () => {
   expect(summary()).toContain('all seven days are the same — one command')
 })
 
+test('a day padded with 00:00 copies no stray row (issue #4)', async () => {
+  // 8.0 until 20:00, then 11.5 -- with 00:00 in the unused slots instead of 24:00.
+  answer = (day) => [0x21, day, 0x10, 120, ...Array.from({ length: 6 }, () => [0x17, 0]).flat()]
+  const times = () => [...document.body.querySelectorAll('input[type="time"]')].map((i) => (i as HTMLInputElement).value)
+  await mount()
+  expect(times()).toEqual(['20:00'])
+  await click(/Copy Monday to/)
+  await click('every day', panel())
+  await click('Copy onto 6 days', panel())
+  await click('Tue')
+  expect(times()).toEqual(['20:00'])
+})
+
 test('cancel copies nothing', async () => {
   await mount()
   await click(/Copy Monday to/)
