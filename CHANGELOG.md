@@ -12,6 +12,8 @@ Built on 2.00. Both the radio and the thermostat change.
 - **A thermostat showing an error code (F1, F2, F3) still answers Home Assistant and the app**, at
   no extra battery cost. It used to stop answering a second after the code appeared, so the error
   could only be seen at the radiator. Leaving the error still takes a BOOST press.
+- **The `On`/`OFF` word after you toggle a setting shows for half a second**, every time. It used to
+  stay up to two seconds and covered the item if you wanted to press again.
 - **Home Assistant no longer logs a warning for every broadcast.** The flags (window, lock, boost,
   battery low, mode) now go out in the order its decoder asks for. The values are the same.
 - **The low-battery warning comes at 2.4 V on every thermostat**, as on eQ-3's firmware, for alkaline
