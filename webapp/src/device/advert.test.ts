@@ -45,10 +45,10 @@ const SET0 = new Uint8Array([
 ])
 const withData = () => new Map([[0xfcd2, new DataView(SET0.buffer)]])
 
-/** The OTHER half: window, lock, boost, battery-low, mode — the flags, whose first value is
- *  `window`, which is how `setCounts` tells the two apart. */
+/** The OTHER half: mode, boost, battery-low, lock, window — the flags, whose first value is
+ *  `count/mode`, which is how `setCounts` tells the two apart. */
 const SET1 = new Uint8Array([
-  0x40, 0x2d, 0x01, 0x1f, 0x00, 0x0f, 0x00, 0x15, 0x00, 0x09, 0x01,
+  0x40, 0x09, 0x01, 0x0f, 0x00, 0x15, 0x00, 0x1f, 0x00, 0x2d, 0x01,
 ])
 const withFlags = () => new Map([[0xfcd2, new DataView(SET1.buffer)]])
 
@@ -116,7 +116,7 @@ test('each object set is tallied under its own first value name', async () => {
   await rig.send(withData())
 
   const r = reportFor(rig.device.id)
-  expect(r.setCounts).toEqual({ temperature: 2, window: 1 })
+  expect(r.setCounts).toEqual({ temperature: 2, 'count/mode': 1 })
   // The total still counts every broadcast; the halves are how it splits, not a second total.
   expect(r.count).toBe(3)
   expect(r.setsSeen).toBe(2)

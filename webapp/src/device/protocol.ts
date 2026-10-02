@@ -205,7 +205,10 @@ export const relText = (version: string) => `v${version}`
  * something has half-installed — so it is never worth showing one without the other.
  */
 export const releaseText = (version: string, radio: string) => `v${version} (radio v${radio})`
-/** Our firmware's version byte. Anything else is a stock image, whatever its number. */
+/**
+ * Our FIRST firmware's version byte, 2.00. Every release of ours reports this or more (2.01 is 201),
+ * and every eQ-3 image reports less (1.48 is its last), so `>=` is the whole test.
+ */
 export const FW_MOD = 200
 
 /**

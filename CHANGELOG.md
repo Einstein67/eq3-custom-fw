@@ -1,6 +1,15 @@
 # What's new
 
-## 2.00 — this firmware
+## 2.01 — this firmware
+
+Built on 2.00. The radio changes; the thermostat changes only the version number it reports.
+
+- **Home Assistant no longer logs a warning for every broadcast.** The flags (window, lock, boost,
+  battery low, mode) now go out in the order its decoder asks for. The values are the same.
+
+---
+
+## 2.00
 
 Built on eQ-3's 1.48. Everything the original does, plus the following. You can go back to any eQ-3
 version at any time.

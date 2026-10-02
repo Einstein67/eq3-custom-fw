@@ -23,8 +23,8 @@ import { LCD_PANEL_BYTES, byTag, type Match, type Reply } from './protocol'
  * `cmd 0x18` (the block read) pointed at the STM8's mapped segment RAM, which was the last address
  * anywhere in this app. That address is a peripheral and could not have gone stale — what it cost is
  * that the app had one at all, and that a read-any-address primitive had to keep shipping for the
- * Display tab to work. There is no fallback to the old way: 2.00 has never been released, so there
- * is no device in anyone's hands that answers one and not the other.
+ * Display tab to work. There is no fallback to the old way: the released 2.00 already answers
+ * `cmd 0x23`, so no release of ours answers one and not the other.
  */
 export const PANEL_ONCE = 0
 /** Ask to be SENT the panel whenever it changes — and answer once now. Renew it or it lapses. */

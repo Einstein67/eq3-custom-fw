@@ -115,11 +115,15 @@ only by which comes first. A decoder that indexes by id alone gets one of the tw
 
 | object id | meaning | encoding |
 |---|---|---|
-| `0x2D` | window open | 1 = open |
-| `0x1F` | lock | **inverted** — 1 = *un*locked |
+| `0x09` | mode | 0 auto, 1 manual, 2 holiday |
 | `0x0F` | boost running | 1 = running |
 | `0x15` | battery low | 1 = low |
-| `0x09` | mode | 0 auto, 1 manual, 2 holiday |
+| `0x1F` | lock | **inverted** — 1 = *un*locked |
+| `0x2D` | window open | 1 = open |
+
+These go out in ascending object-id order, which is what Home Assistant's BThome decoder asks for.
+A 2.00 radio sends the same five as `0x2D 0x1F 0x0F 0x15 0x09`; a decoder that reads by object id
+takes both.
 
 **Set C — a button or wheel event** (only when one happens):
 

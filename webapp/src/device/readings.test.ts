@@ -25,7 +25,7 @@ test('a real set-0 payload reads as measurements, not as wire names', () => {
 })
 
 test('a real set-1 payload reads as words, never true or false', () => {
-  const { values } = decodeObjects(bytes('2d001f010f0015000900'))
+  const { values } = decodeObjects(bytes('09000f0015001f012d00'))
   expect(describeValues(values).map((r) => `${r.label} ${r.text}`)).toEqual([
     // NO "battery warning none": a warning that is not warning is the absence of news, and it
     // appeared on every row, pushing the readings that ARE news along the line.
@@ -54,7 +54,7 @@ test('the full table has the same rows before, during and after the two sets arr
   const nothing = shape({})
   expect(nothing).toEqual(BROADCAST_FIELDS)
   expect(shape(decodeObjects(bytes('029a0b0278050cde0c2f00')).values)).toEqual(nothing)
-  expect(shape(decodeObjects(bytes('2d001f010f0015000900')).values)).toEqual(nothing)
+  expect(shape(decodeObjects(bytes('09000f0015001f012d00')).values)).toEqual(nothing)
   // Nothing heard yet is a dash per row, not a missing row.
   expect(describeAll({}).every((r) => r.text === null)).toBe(true)
   // And a warning that the compact view hides still has its line here.
@@ -66,7 +66,7 @@ test('the two columns are the two adverts — one fills while the other stays em
   // fill the first column and leave the second entirely unheard, and the other way round. If the
   // firmware ever moves an object between sets, this is what says so.
   const set0 = decodeObjects(bytes('029a0b0278050cde0c2f00')).values
-  const set1 = decodeObjects(bytes('2d001f010f0015000900')).values
+  const set1 = decodeObjects(bytes('09000f0015001f012d00')).values
   const heard = (v: Record<string, BthomeValue>) =>
     describeSets(v).map((g) => g.every((r) => r.text !== null))
 

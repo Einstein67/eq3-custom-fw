@@ -10,9 +10,9 @@
    "counter": 498
   },
   {
-   "raw": "41cb27fe09cdb9687ca1edf9010000fd2fd708",
+   "raw": "41ef27ee08d7b9627d85edf9010000d324d738",
    "device_info": 65,
-   "plaintext": "2d001f010f0015000900",
+   "plaintext": "09000f0015001f012d00",
    "counter": 505
   },
   {
@@ -22,9 +22,9 @@
    "counter": 512
   },
   {
-   "raw": "419c2f4f9d67b5de63377b15020000bd76d763",
+   "raw": "41b82f5f9c7db5d462137b15020000ed886fba",
    "device_info": 65,
-   "plaintext": "2d001f010f0015000900",
+   "plaintext": "09000f0015001f012d00",
    "counter": 533
   }
  ]

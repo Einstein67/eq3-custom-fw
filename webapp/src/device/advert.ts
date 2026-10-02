@@ -75,7 +75,7 @@ export type AdvertReport = {
    * broadcasts: a total that looks healthy can still be one half arriving and the other never, in
    * which case half the readings on screen are as old as the page.
    *
-   * Keyed by the first value name — `temperature`, `window`, `packet_id` — rather than by the
+   * Keyed by the first value name — `temperature`, `count/mode`, `packet_id` — rather than by the
    * object-id signature that keys `sets`, because this one is read by a person. It is the decoder's
    * own wire name, not a label invented here, so it cannot say something the payload does not.
    */

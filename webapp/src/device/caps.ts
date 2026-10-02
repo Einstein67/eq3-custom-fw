@@ -27,8 +27,8 @@ import { CHIP_MOD_MAJOR, FW_MOD, type ChipVersion } from './protocol'
  * What a control needs. The names are features, not command ids — ids move between chips.
  *
  * **THE LAST FOUR ARE PROBES RATHER THAN VERSIONS, and they are here for exactly that reason**
- * `[owner]`. A version cannot answer every question: the radio reports `5.0` for every image we have
- * ever shipped, including the ones from before the name command existed, so "can this thermostat be
+ * `[owner]`. A version cannot answer every question: the radio reported `5.0` for every 2.00 build,
+ * including the ones from before the name command existed, so "can this thermostat be
  * renamed" is settled only by asking it. A row that decides that for itself is a row we cannot hold
  * to the others — the name row once greyed itself out and said the radio was too old, on a screen
  * showing that radio's version as ours.
@@ -78,7 +78,7 @@ export type Verdict = { ok: boolean; reason: string | null }
  * themselves** — `gate` does, because "still asking" and "this is a stock thermostat" are different
  * things to say to a person, and `pairing` does, because a pair cannot be judged from one version.
  */
-export const isModFw = (fw: number | null): boolean => fw === FW_MOD
+export const isModFw = (fw: number | null): boolean => fw !== null && fw >= FW_MOD
 export const isModRadio = (chip: ChipVersion | null): boolean =>
   chip !== null && chip.major >= CHIP_MOD_MAJOR
 

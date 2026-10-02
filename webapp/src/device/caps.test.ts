@@ -70,6 +70,12 @@ test('a radio newer than ours still counts as ours', () => {
   expect(gate('modRadio', caps({ chip: { product: 1, major: 6, minor: 2 } })).ok).toBe(true)
 })
 
+test('every release of ours counts as ours, not only the first', () => {
+  // 2.01 reports 201. Matching 200 exactly greyed out every mod control on it.
+  expect(gate('modThermostat', caps({ fw: 201 })).ok).toBe(true)
+  expect(pairing(201, { product: 1, major: 5, minor: 1 })).toBe('matched')
+})
+
 /* ---- the pairing, which decides whether ONE version can stand for the device ------------------- */
 
 test('a device wholly on one firmware or the other is a MATCHED pair', () => {

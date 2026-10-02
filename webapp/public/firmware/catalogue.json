@@ -18,6 +18,23 @@
       }
     },
     {
+      "version": "2.01",
+      "mod": true,
+      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id.",
+      "stm8": {
+        "file": "stm8-2.01.enc",
+        "bytes": 34816,
+        "sha256": "8765d335e61bbc75985d4515fd7bf74abe8673875f363a69f142766d4434d739",
+        "expect": 201
+      },
+      "radio": {
+        "file": "radio-2.01.bin",
+        "bytes": 27312,
+        "sha256": "36fb451c22cb2255dc5b80af3562ef3231c421a38d51a2a92f9f8578a153cabc",
+        "expect": "5.1"
+      }
+    },
+    {
       "version": "1.05",
       "mod": false,
       "note": "The earliest firmware here. Little reason to choose it except to see what the thermostat originally shipped with.",
@@ -123,6 +140,6 @@
   "rescue_radio": {
     "file": "rescue-radio.bin",
     "bytes": 27344,
-    "sha256": "f9e8129cd87c4d64407d76c64c2bea107f56ff1063cd05b7721858c45ba3c59d"
+    "sha256": "5cfbef35a089995a5a961aba875af80ab7c4175b5ce42163fd16474c3c421d2e"
   }
 }

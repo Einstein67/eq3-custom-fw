@@ -89,8 +89,9 @@ const unknownOf = (values: Record<string, BthomeValue>): Reading[] =>
     .map((k) => ({ key: k, label: k, text: String(values[k]) }))
 
 /**
- * WHAT THIS THERMOSTAT AIRS — the two alternating object sets, in the order the radio chip builds
- * them `[binary]` (`ble_chip/mod/bthome.S`, the set table at the top of the file).
+ * WHAT THIS THERMOSTAT AIRS — the two alternating object sets `[binary]` (`ble_chip/mod/bthome.S`,
+ * the set table at the top of the file). Which set a value rides in is the wire's; the row order
+ * inside a set is this view's, since set 1 airs in ascending object-id order.
  *
  * **THE GROUPING IS THE WIRE'S, NOT A LAYOUT CHOICE.** One advert carries set 0 and the next
  * carries set 1, about a second apart, and they never appear together — so a view that shows them
