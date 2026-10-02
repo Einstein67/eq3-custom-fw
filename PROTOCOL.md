@@ -600,7 +600,7 @@ want it.
 | byte | what |
 |---|---|
 | 0 | `24` |
-| 1 | why the **radio** last started: `0` a cold start (batteries in, or anything the radio cannot tell from one), `1` after a crash, `2` after a radio update began (applied, refused or abandoned), `3` any other restart |
+| 1 | why the **radio** last started: `0` a cold start (batteries in, or the thermostat chip restarting the radio from deep sleep, which looks the same to it), `1` after a crash, `2` after a radio update began (applied, refused or abandoned), `3` any other restart |
 | 2–4 | how many radio restarts of kinds `1`, `2` and `3` since its last cold start (each stops at 255) |
 | 5–6 | minutes since the radio last started |
 | 7–8 | minutes since the thermostat chip last started, as the radio saw it; `FFFF` when the radio has restarted since, and bytes 9–17 are then the last report it kept |
