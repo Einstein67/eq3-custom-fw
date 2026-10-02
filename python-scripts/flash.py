@@ -213,16 +213,19 @@ async def connect(spec, adapter=None, timeout=30, tries=4, disconnected_callback
     """
     deadline = time.monotonic() + budget
     last = None
+    heard = False           # did a scan find it? Then it is in range, and a refusal has another cause
     for attempt in range(tries):
         left = deadline - time.monotonic()
         if left <= 1.0:
             raise ConnectFailed(f"could not reach {spec} within {budget:.0f}s "
-                                f"({attempt} attempt(s)); last failure: {last}")
+                                f"({attempt} attempt(s)); last failure: {last}"
+                                + (HELD_ELSEWHERE if heard else ""))
         client = None
         if attempt:
             print(f"    retry {attempt + 1}/{tries} after {last}")
         try:
             dev = await resolve(spec, adapter=adapter, timeout=max(5.0, min(20.0, left)))
+            heard = True
             client = BleakClient(dev,
                                  timeout=max(5.0, min(timeout, deadline - time.monotonic())),
                                  disconnected_callback=disconnected_callback)
@@ -242,9 +245,20 @@ async def connect(spec, adapter=None, timeout=30, tries=4, disconnected_callback
                     pass
         await asyncio.sleep(1.0 + attempt)
     raise ConnectFailed(
-        f"could not reach {spec} after {tries} attempts -- last: {last}\n"
-        "  If it IS in range (--list), this is your computer's Bluetooth rather than the thermostat:\n"
-        "  turn Bluetooth off and on, or on Linux `bluetoothctl remove <MAC>` to drop a stale entry.")
+        f"could not reach {spec} after {tries} attempts -- last: {last}"
+        + (HELD_ELSEWHERE if heard else
+           "\n  If it IS in range (--list), this is your computer's Bluetooth rather than the thermostat:\n"
+           "  turn Bluetooth off and on, or on Linux `bluetoothctl remove <MAC>` to drop a stale entry."))
+
+
+# HEARD BUT NOT CONNECTABLE IS USUALLY SOMEBODY ELSE'S LINK `[owner]`. The thermostat takes one
+# connection at a time and keeps broadcasting while it is held, so a unit the scan found and could not
+# open is most often held by Home Assistant's own thermostat integration `[manually verified]`.
+HELD_ELSEWHERE = (
+    "\n  It IS broadcasting, so it is in range. Something else is probably connected to it -- the"
+    "\n  thermostat takes one connection at a time. If Home Assistant manages this thermostat, disable"
+    "\n  it there (or close any other app using it) and try again. Your computer's Bluetooth is the"
+    "\n  other suspect: turn it off and on, or on Linux `bluetoothctl remove <MAC>`.")
 
 
 # ---------------------------------------------------------------- what to install ----
@@ -255,11 +269,15 @@ def load_catalogue():
     path = os.path.join(FIRMWARE, "catalogue.json")
     if not os.path.isfile(path):
         sys.exit(f"no firmware catalogue at {os.path.normpath(path)} -- this folder is incomplete")
-    return json.load(open(path))["releases"]
+    # NEWEST FIRST, SORTED HERE rather than trusted from the file, as the web page does: the file
+    # lists a frozen release of ours before the current one, so "the first of ours" read 2.00 once
+    # 2.01 existed. Compared part by part, so 1.10 sorts above 1.9.
+    return sorted(json.load(open(path))["releases"],
+                  key=lambda r: [int(p) for p in r["version"].split(".")], reverse=True)
 
 
 def pick(releases, want):
-    """`--release X`, or the newest of ours. The list is written newest-first."""
+    """`--release X`, or the newest of ours. `load_catalogue` sorts the list newest-first."""
     if want:
         for r in releases:
             if r["version"] == want:
