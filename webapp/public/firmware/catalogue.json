@@ -24,13 +24,13 @@
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,
-        "sha256": "372855ffc42cbe73334e89e2045943e0bbce6fae7ede968888b4b6a24ea0510c",
+        "sha256": "49510816e0e5f5d1fae55f5584551ab3c49ce4c3fcf6f285ad0840b0b942a216",
         "expect": 201
       },
       "radio": {
         "file": "radio-2.01.bin",
-        "bytes": 27312,
-        "sha256": "36fb451c22cb2255dc5b80af3562ef3231c421a38d51a2a92f9f8578a153cabc",
+        "bytes": 27104,
+        "sha256": "87fc4eb85e6b599e21b06e2504702abee74668e0707a1c0a4e437875bf8d1a12",
         "expect": "5.1"
       }
     },
