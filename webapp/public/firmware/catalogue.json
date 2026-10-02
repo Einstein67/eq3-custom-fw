@@ -20,7 +20,7 @@
     {
       "version": "2.01",
       "mod": true,
-      "note": "Everything 2.00 does. Fixes a Home Assistant warning by sending the BTHome fields sorted by id. The low-battery warning is back at 2.4 V on every thermostat. All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44 bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.",
+      "note": "Everything 2.00 does, using less battery. A connected thermostat answers faster on one steady rhythm; some adapters no longer keep it awake; a phone or hub that vanishes is given up after 6 s instead of 30. The broadcast interval survives a radio update. Home Assistant can pair through an ESPHome proxy with the PIN on. No more Home Assistant warning on every broadcast, and the low-battery warning is back at 2.4 V on every thermostat. Debug code from development is removed.",
       "stm8": {
         "file": "stm8-2.01.enc",
         "bytes": 34816,

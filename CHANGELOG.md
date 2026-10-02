@@ -14,8 +14,7 @@ Built on 2.00. Both the radio and the thermostat change.
   Bluetooth adapter we have and an ESPHome proxy through Home Assistant: a single request is
   answered in well under a second, and a burst of 20 in a few seconds. When Home Assistant (or
   anything else) speeds the connection up, the radio asks for its rhythm back about a second after
-  things go quiet, and it checks which rhythm is actually running, so a request the other side did
-  not apply is asked for again. Firmware updates still run at full speed.
+  things go quiet. Firmware updates still run at full speed.
 - **Some Bluetooth adapters no longer keep the thermostat awake.** Certain adapters announce their
   channel changes far in advance, and until the change the radio used to wake at every connection
   event. It now keeps sleeping in between and wakes just before the change, which more than halves
@@ -35,8 +34,24 @@ Built on 2.00. Both the radio and the thermostat change.
   written by Home Assistant showed extra rows at 00:00 and an error, and copying a day spread them to
   every other day. A time can no longer be set earlier than the row above it or later than the row
   below.
-- All the debug instrumentation left from development is removed, freeing 37 bytes of flash and 44
-  bytes of RAM on the stm8, and 240 bytes RAM & flash on the radio.
+- All the debug instrumentation left from development is removed. That frees 37 bytes of flash and
+  44 bytes of RAM on the stm8, and 240 bytes on the radio, whose image still grows overall with the
+  features above.
+
+**In the app and the tools:**
+
+- **A connect that fails is retried** for the whole time the app is looking for the thermostat,
+  instead of giving up after the first refusal.
+- **A thermostat the app can hear but not open is probably held by something else**, most often Home
+  Assistant: it takes one connection at a time. The app and `flash.py` now say so.
+- **The firmware list marks every release of this firmware**, and shows which one is installed.
+- **On a Mac, a thermostat still on eQ-3's original radio** gets the message that applies to it,
+  instead of being told to pair.
+- **`flash.py` installs the newest release.** With two releases listed it would have picked the
+  older one.
+- **The UART rescue reaches more radios:** one whose firmware crashes before its serial port starts
+  (`python-scripts/README.md` says how), and it needs no battery pull. Unplug the USB-serial adapter before restarting the thermostat
+  afterwards, or the radio stays in its rescue mode.
 
 ---
 
