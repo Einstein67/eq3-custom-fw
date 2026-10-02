@@ -38,12 +38,28 @@ an ST-Link attached, for a dump and then for `recover`.
 Once it is in, it stays in for the rest of that run, so a command that does several things
 connects once.
 
+IF IT NEVER ANSWERS: HOLD SDA LOW AT RESET
+==========================================
+An image that crashes before it switches the serial port on leaves this wire silent. The boot ROM
+reads a header from the radio's memory chip at power-on, and when that read fails it starts no
+image and waits on this port `[binary]` (`config_Check_the_Presence_of_Static_Section` looks for
+first byte 01, length 6 or 8). Grounding the module's SDA pin through a reset makes it fail
+`[manually verified]`. The pad, the reset point and the steps are in ./README.md, "When the script
+says the boot ROM never answered".
+
+A ROM in that state behaves differently, and the code below allows for all of it `[manually
+verified]`: it answers HCI Reset but ignores Download Minidriver, so the minidriver is written and
+launched without it; its RAM copy of which slot it booted is stale, so the slot is worked out from
+the headers the way the ROM reads them (`booted_ds`); and the memory chip reads all zeros until the
+needle is lifted, so the first read waits for real data. **Everything must happen in one run**: a
+second run opens with HCI Reset, which the running minidriver may take as a reboot `[inferred]` --
+it ended one such session -- so `recover` takes its own backup.
+
 THE REASON MOST PEOPLE ARE HERE
 ===============================
     pip install -r requirements.txt
 
-    python3 ble_chip_via_uart.py dump    -p /dev/ttyUSB0 -o eeprom_backup.bin   # do this first
-    python3 ble_chip_via_uart.py recover -p /dev/ttyUSB0
+    python3 ble_chip_via_uart.py recover -p /dev/ttyUSB0      # saves a backup of all 64 KB first
     ... unplug the adapter, power-cycle the thermostat so the radio boots it, close the case ...
 
 **UNPLUG THE ADAPTER BEFORE THAT POWER CYCLE.** While it is on the wire the radio stays in its boot
@@ -212,14 +228,14 @@ class HCITransport:
             self.ser.read(256)
 
 
-def wait_for_rom(hci, timeout=60):
+def wait_for_rom(hci, timeout=300):
     """Call the boot ROM until it answers. Nothing needs doing at the device (header).
 
     IF IT NEVER ANSWERS AT ALL, check the wiring first -- swapped TX and RX look exactly like this.
 
-    If it still never answers, the chip may be beyond this wire. The serial port it replies on is
-    switched on by the firmware's own start-up, so firmware that crashes before it gets there leaves
-    the port correctly wired and permanently silent. There is no other way in to this chip."""
+    If it still never answers, the image is crashing before it switches the port on: hold SDA low
+    through a reset (header, "IF IT NEVER ANSWERS"). The timeout is long for that case -- the
+    needle takes several tries, and a healthy chip answers in seconds anyway."""
     print("calling the radio's boot ROM ...")
     hci.reset_input()
     start = time.time()
@@ -241,7 +257,9 @@ def wait_for_rom(hci, timeout=60):
         if elapsed - last_print >= 10:
             print(f"  Still waiting... ({elapsed:.0f}s)")
             last_print = elapsed
-    print("Timeout waiting for ROM bootloader. Check the wiring: TX to pin 3, RX to pin 4, GND to pin 2.")
+    print("Timeout waiting for ROM bootloader. Check the wiring: TX to pin 3, RX to pin 4, GND to pin 2.\n"
+          "If the wiring is right, the image crashes before the port starts: hold SDA low through a "
+          "reset (README.md, \"When the script says the boot ROM never answered\").")
     return False
 
 
@@ -255,11 +273,14 @@ def load_minidriver(hci):
     segments = parse_intel_hex(hex_path)
     entry_point = segments[0][0]
 
+    # A ROM that found no header ignores this and still takes the writes below (header).
     hci.send_cmd(0xFC2E)
-    r = hci.wait_command_complete(0xFC2E, timeout=5.0)
-    if not r or r[1] != 0:
+    r = hci.wait_command_complete(0xFC2E, timeout=2.0)
+    if r and r[1] != 0:
         print(f"Download Minidriver command failed: {r}")
         return False
+    if not r:
+        print("no answer to Download Minidriver -- a ROM that found no header ignores it; continuing")
 
     for addr, data in segments:
         offset = 0
@@ -326,14 +347,22 @@ def write_eeprom_verified(hci, offset, data, chunk=WRITE_CHUNK, on_progress=None
     """Write `data` at `offset` in `chunk`-sized pieces, reading each one back immediately after
     writing it. Returns None on success, or an error string identifying exactly where it failed --
     upstream's whole-transfer-then-verify left no way to know how far a failed write actually got."""
+    # EACH PIECE IS RETRIED for a minute before giving up: a bus leaking to ground (a wet board)
+    # fails for seconds at a time and then works perfectly `[manually verified]`.
     for off in range(0, len(data), chunk):
         piece = data[off:off + chunk]
-        if not write_eeprom(hci, offset + off, piece):
-            return f"write failed at +{off:#06x} ({off}/{len(data)})"
-        back = read_eeprom(hci, offset + off, len(piece))
-        if back != piece:
-            return (f"verify mismatch at +{off:#06x}: wrote {piece.hex()} got "
-                    f"{back.hex() if back else None}")
+        start = time.time()
+        while True:
+            ok = write_eeprom(hci, offset + off, piece)
+            back = read_eeprom(hci, offset + off, len(piece)) if ok else None
+            if back == piece:
+                break
+            if time.time() - start > 60:
+                if not ok:
+                    return f"write failed at +{off:#06x} ({off}/{len(data)})"
+                return (f"verify mismatch at +{off:#06x}: wrote {piece.hex()} got "
+                        f"{back.hex() if back else None}")
+            time.sleep(1.0)
         if on_progress:
             on_progress(off + len(piece), len(data))
     return None
@@ -345,10 +374,19 @@ def enter_download_mode(hci):
         return False
     if not load_minidriver(hci):
         return False
-    data = read_eeprom(hci, 0x0000, 4)
-    if data is None:
-        print("EEPROM read test failed!")
-        return False
+    # All zeros is SDA still held low -- the needle, or a wet board (header). Wait for real data.
+    start = time.time()
+    while True:
+        data = read_eeprom(hci, 0x0000, 4)
+        if data is not None and any(data):
+            break
+        if time.time() - start > 300:
+            print("EEPROM read test failed!" if data is None else
+                  "the memory chip still reads all zeros -- SDA is held low (needle, bridge or a wet board)")
+            return False
+        if data is not None and time.time() - start < 1.5:
+            print("the memory chip reads all zeros -- lift the needle off SDA; waiting ...")
+        time.sleep(1.0)
     print(f"EEPROM access verified (SS1: {data.hex()})")
     return True
 
@@ -418,9 +456,8 @@ def cmd_ds_status(args):
         if not enter_download_mode(hci):
             return 1
 
-        raw = peek_ram(hci, CONFIG_DS_LOCATION, 4)
-        live = struct.unpack('<I', raw)[0] if raw else None
-        print(f"live Config_DS_Location (RAM {CONFIG_DS_LOCATION:#010x}): "
+        live = booted_ds(hci)
+        print(f"booted DS: "
               f"{'unreadable' if live is None else f'{live:#010x}'}"
               + ("" if live is None else f"  -> {'DS1' if live == DS1_OFFSET else 'DS2' if live == DS2_OFFSET else 'UNRECOGNIZED'}"))
 
@@ -471,6 +508,34 @@ def find_trusted_ss(hci, live):
     return None
 
 
+CONFIG_AND_FIRMWARE_STATUS = 0x2044cc  # RAM -- bits 4-6: where the ROM found its config, 0 = nowhere
+
+
+def booted_ds(hci):
+    """The DS offset the ROM boots, or None if it cannot be told.
+
+    NORMALLY THE ROM'S OWN RAM RECORD, `Config_DS_Location`. A ROM that found no header (SDA held
+    low at reset, header) boots nothing, and that cell then holds a stale 0x580 `[manually
+    verified]` while `Config_and_Firmware_Status` bits 4-6 read 0 -- so in that state the answer is
+    worked out from the headers the way the ROM reads them `[binary]`: the first SS, SS1 before SS2,
+    whose first byte is 01 and whose length field is 6 or 8, is the one it trusts."""
+    st = peek_ram(hci, CONFIG_AND_FIRMWARE_STATUS, 1)
+    if st is not None and st[0] & 0x70:
+        raw = peek_ram(hci, CONFIG_DS_LOCATION, 4)
+        return struct.unpack('<I', raw)[0] if raw else None
+    print("the ROM booted no image (its header read failed at reset) -- taking the slot from the "
+          "header it will read next time")
+    for base in (SS1_OFFSET, SS2_OFFSET):
+        ss = read_ss(hci, base)
+        if ss is None or ss[0] != 0x01 or (ss[1] | ss[2] << 8) not in (6, 8):
+            continue
+        items, ok = parse_ss_chain(ss)
+        off = find_ds_location_item(items) if ok and checksum_item1_ok(items) else None
+        if off is not None:
+            return struct.unpack_from('<I', ss, off)[0]
+    return None
+
+
 def cmd_ds_select(args):
     """Flip whichever SS is actually being trusted (matches the live RAM read) to point at the
     requested DS slot -- a single small write to an unprotected 4-byte field, not a DS rewrite.
@@ -482,12 +547,11 @@ def cmd_ds_select(args):
         if not enter_download_mode(hci):
             return 1
 
-        raw = peek_ram(hci, CONFIG_DS_LOCATION, 4)
-        live = struct.unpack('<I', raw)[0] if raw else None
+        live = booted_ds(hci)
         if live is None:
-            print("could not read live Config_DS_Location -- refusing to guess which SS to edit")
+            print("could not tell which DS the chip boots -- refusing to guess which SS to edit")
             return 1
-        print(f"live Config_DS_Location = {live:#010x}")
+        print(f"booted DS = {live:#010x}")
 
         target_ss = find_trusted_ss(hci, live)
         if target_ss is None:
@@ -515,32 +579,38 @@ def cmd_ds_select(args):
 
 # --------------------------------------------------------------------------------------- dump / flash / flash-fw
 
+def save_dump(hci, path):
+    """Read all 64 KB into `path`. Returns False if any piece could not be read."""
+    print(f"Dumping EEPROM ({EEPROM_SIZE // 1024}KB)...")
+    dump = bytearray()
+    complete = True
+    for offset in range(0, EEPROM_SIZE, READ_CHUNK):
+        remaining = min(READ_CHUNK, EEPROM_SIZE - offset)
+        data = read_eeprom(hci, offset, remaining)
+        if data:
+            dump.extend(data)
+        else:
+            print(f"  Read failed at 0x{offset:04X}, padding with 0xFF")
+            dump.extend(b'\xFF' * remaining)
+            complete = False
+
+        pct = (offset * 100) // EEPROM_SIZE
+        if pct % 10 == 0 and offset > 0 and offset % (EEPROM_SIZE // 10) < READ_CHUNK:
+            print(f"  {pct}%")
+
+    with open(path, 'wb') as f:
+        f.write(dump)
+    print(f"Saved {len(dump)} bytes to {path}")
+    return complete
+
+
 def cmd_dump(args):
     """Dump full EEPROM to file."""
     hci = HCITransport(args.port)
     try:
         if not enter_download_mode(hci):
             return 1
-
-        print(f"Dumping EEPROM ({EEPROM_SIZE // 1024}KB)...")
-        dump = bytearray()
-
-        for offset in range(0, EEPROM_SIZE, READ_CHUNK):
-            remaining = min(READ_CHUNK, EEPROM_SIZE - offset)
-            data = read_eeprom(hci, offset, remaining)
-            if data:
-                dump.extend(data)
-            else:
-                print(f"  Read failed at 0x{offset:04X}, padding with 0xFF")
-                dump.extend(b'\xFF' * remaining)
-
-            pct = (offset * 100) // EEPROM_SIZE
-            if pct % 10 == 0 and offset > 0 and offset % (EEPROM_SIZE // 10) < READ_CHUNK:
-                print(f"  {pct}%")
-
-        with open(args.output, 'wb') as f:
-            f.write(dump)
-        print(f"Saved {len(dump)} bytes to {args.output}")
+        save_dump(hci, args.output)
         return 0
     finally:
         hci.close()
@@ -654,18 +724,23 @@ def cmd_recover(args):
         if not enter_download_mode(hci):
             return 1
 
-        raw = peek_ram(hci, CONFIG_DS_LOCATION, 4)
-        live = struct.unpack('<I', raw)[0] if raw else None
+        live = booted_ds(hci)
         if live is None:
-            print("could not read which DS the chip booted from -- refusing to write blind.")
+            print("could not tell which DS the chip boots -- refusing to write blind.")
             return 1
         # The slot it is NOT running. Whichever that is, writing it cannot cost the working image.
         target_ds = 2 if live == DS1_OFFSET else 1
         target_off = ds_addr(target_ds)
         print(f"booted from {live:#06x} -> writing the spare slot, DS{target_ds} at {target_off:#06x}")
 
+        # THE BACKUP IS TAKEN IN THIS RUN, not left to a `dump` before it: a chip reached by holding
+        # SDA low may reboot into its crashed image when the next run opens (header).
+        backup = time.strftime("eeprom_backup_%Y%m%d-%H%M%S.bin")
+        if not save_dump(hci, backup):
+            print("the backup has unreadable pieces -- not writing. Run `recover` again.")
+            return 1
+
         print(f"\nAbout to write {len(fw_data)} bytes and point the chip at them.")
-        print("Take an EEPROM backup first if you have not: `dump -o backup.bin`.")
         if input("Continue? (yes/no): ").strip().lower() != 'yes':
             print("Aborted.")
             return 0
@@ -737,16 +812,15 @@ def cmd_flash_fw(args):
         if not enter_download_mode(hci):
             return 1
 
-        raw = peek_ram(hci, CONFIG_DS_LOCATION, 4)
-        live = struct.unpack('<I', raw)[0] if raw else None
+        live = booted_ds(hci)
         if live is None:
-            print("could not read live Config_DS_Location -- refusing to write blind. Use "
+            print("could not tell which DS the chip boots -- refusing to write blind. Use "
                   "--force-active only if you understand the risk and this check is the problem.")
             if not args.force_active:
                 return 1
         elif live == ds_offset and not args.force_active:
             print(f"REFUSING: DS{args.ds} at {ds_offset:#06x} is the CURRENTLY ACTIVE slot "
-                  f"(live Config_DS_Location = {live:#010x}). Writing it risks leaving the device "
+                  f"(booted DS = {live:#010x}). Writing it risks leaving the device "
                   f"with no fallback if this write fails partway. Write the INACTIVE DS instead, "
                   f"verify it, then `ds-select` to flip. Pass --force-active only if you genuinely "
                   f"mean to overwrite the running image in place.")
@@ -961,7 +1035,7 @@ def main():
     p_select.add_argument(*port_arg['flags'], **port_arg['kwargs'])
     p_select.add_argument('--ds', type=int, choices=[1, 2], required=True)
 
-    p_dump = sub.add_parser('dump', help="Save the chip's whole memory to a file -- do this first")
+    p_dump = sub.add_parser('dump', help="Save the chip's whole memory to a file (recover saves one itself)")
     p_dump.add_argument(*port_arg['flags'], **port_arg['kwargs'])
     p_dump.add_argument('--output', '-o', required=True)
 

@@ -65,15 +65,14 @@ Hold the board so the `PRG2` text reads the right way up; pin 1 is then on the l
 stay connected.
 
 ```sh
-python3 ble_chip_via_uart.py dump    -p /dev/ttyUSB0 -o eeprom_backup.bin
 python3 ble_chip_via_uart.py recover -p /dev/ttyUSB0
 ```
 
 **Nothing needs doing at the thermostat while it connects** — no battery pull, no power cycle. The
 script calls the chip's boot ROM until it answers.
 
-`recover` writes into the slot the chip is *not* running and checks every byte before switching to
-it, so a write that fails halfway leaves the chip booting what it had. Then unplug the wires,
+`recover` first saves the radio's whole memory to `eeprom_backup_<date>-<time>.bin`, then writes
+into the slot the chip is *not* running and checks every byte before switching to it, so a write that fails halfway leaves the chip booting what it had. Then unplug the wires,
 power-cycle the thermostat so the radio boots the new image, close the case, and `flash.py <device>`
 finishes the job over Bluetooth as normal. **Unplug the adapter before that power cycle**: while it is
 attached the radio stays in its boot ROM and never starts an image, so it looks as dark as before.
@@ -81,6 +80,40 @@ attached the radio stays in its boot ROM and never starts an image, so it looks 
 The image it installs is built to be found: it advertises twice a second, and it advertises even if
 Bluetooth was switched off on the thermostat. It is meant to be replaced — run `flash.py` as soon as
 the radio answers.
+
+### When the script says the boot ROM never answered
+
+A radio image that crashes at start-up never switches on the serial port, so the script calls into
+silence. The chip can still be reached: its boot ROM reads a header from the radio's own memory chip
+at power-on, and **if that read fails it starts no firmware at all and waits on the serial port**.
+You make the read fail by holding one pad at ground for the moment of a reset. This recovered a
+radio whose image crashed before its serial port started.
+
+- **The pad is pin 22 of the radio module (BTM1), its SDA line.** Hold the board so the silkscreen
+  dot beside the module is top-left: that corner is pin 1. The pins run down the left side (1–12),
+  then left to right along the bottom (13–22). Pin 22 is the **last pad on the right of the bottom
+  row**, next to the corner pad. It has no trace or via, so you touch it at the module's edge with
+  a sewing needle.
+- **Wire the needle to ground (PRG2 pin 2).** Ground is safe here even if the needle slips: the
+  pads beside it are pin 21 (the same bus, which only ever pulls low) and pin 23 (ground).
+- **Reset the radio** by touching test pad **J2** (back of the board, one of the four gold pads
+  beside the `TA2` label) to ground for a moment, or by pulling the batteries.
+
+Then:
+
+1. Start the script first; it waits up to five minutes for the ROM: `python3 ble_chip_via_uart.py recover -p <port>`.
+2. Press the needle on pin 22, reset the radio, keep the needle there for two seconds.
+3. When the script says the ROM answered, **lift the needle**. It waits until the memory chip reads
+   again, saves a backup of all of it, and only then writes.
+
+**Do everything in ONE run of the script.** Every run starts by calling the ROM with a reset
+command, and in this state that reset can reboot the radio into the crashed image, so a second run
+means the needle again. That is why `recover` saves its own backup rather than asking for `dump`
+first.
+
+**Do not use isopropanol near the module.** It carries flux under the module and makes SDA leak to
+ground while it dries: reads then return zeros for minutes at a time. If that has happened, the
+script keeps retrying and continues once the board is dry.
 
 `python3 ble_chip_via_uart.py --help` lists the rest. **`flash` overwrites the whole chip including
 its Bluetooth address**, so use it only to restore a dump from that same thermostat; `flash-fw`
