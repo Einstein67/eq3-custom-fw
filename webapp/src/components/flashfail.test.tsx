@@ -218,8 +218,14 @@ test('A MISSING IMAGE COMES BACK AS THE APP ITSELF, AT STATUS 200 — and is not
     return realFetch(url)
   }) as typeof fetch
   await start()
-  // The thermostat half ran and verified; the radio half refused its image before writing a byte.
-  expect(called).toEqual(['prepare', 'stm8'])
+  // NEITHER CHIP IS WRITTEN, and that is the point of fetching both images up front. This used to
+  // be `['prepare', 'stm8']`: the radio image was not fetched until after the thermostat had been
+  // flashed and confirmed, so a bad — or merely unreachable — radio image left a thermostat on the
+  // new version and a radio on the old one. A release is both chips or neither, so the network is
+  // not allowed to split it, and a bad radio image now fails exactly where a bad thermostat image
+  // does (the test below).
+  expect(called).toEqual(['prepare'])
+  expect(called).not.toContain('stm8')
   expect(called).not.toContain('radio')
   expect(screen().textContent).toMatch(/did not arrive intact/)
 })

@@ -314,10 +314,28 @@ export function FirmwareInstall() {
     }
 
     try {
-      // ---- 1. the thermostat -------------------------------------------------------------------
-      // The payload is hex TEXT, which is the form the eQ-3 updater ships.
-      const payload = unhexPayload(new TextDecoder().decode(await image('stm8', rel.stm8)))
+      // ---- 0. BOTH IMAGES FIRST, AND NOTHING IS WRITTEN UNTIL BOTH ARE IN HAND -----------------
+      //
+      // **A RELEASE IS BOTH CHIPS OR NEITHER, so the network must not be able to split it**
+      // `[owner]`. The radio image used to be fetched at step 2 — after the thermostat had already
+      // been flashed and confirmed — so a connection that died in between left a thermostat on the
+      // new version talking to a radio on the old one. That is not a hypothetical: the two chips
+      // then disagree about how long each command is, and a mismatched pair NAKs mod commands,
+      // reports no BThome at all, and is awkward to recover precisely because its radio is wrong.
+      //
+      // Both downloads are also VERIFIED here (`checkImage` — size and SHA-256 against the
+      // catalogue), so a truncated or substituted file fails before the device is touched rather
+      // than half way through it. Downloading costs seconds; being stranded between versions costs
+      // a case and a wire.
+      const stm8Image = await image('stm8', rel.stm8)
+      const radioImage = await image('radio', rel.radio)
+
+      // The payload is hex TEXT, which is the form the eQ-3 updater ships. Parsed here, with the
+      // other checks, so an unusable file is caught before anything is written.
+      const payload = unhexPayload(new TextDecoder().decode(stm8Image))
       if (!parseChunks(payload).length) throw new Error(`${rel.stm8.file} has no chunks in it`)
+
+      // ---- 1. the thermostat -------------------------------------------------------------------
       await flashThermostat(payload, (done, total, note) => at('stm8', done, total, note))
 
       // It restarts on its own and answers nothing until it has. Poll rather than sleep, so a fast
@@ -341,9 +359,7 @@ export function FirmwareInstall() {
       // ---- 2. the radio ------------------------------------------------------------------------
       // LAST, ALWAYS, and it has to be: its verify step ends by dropping the link, which is how it
       // reports success, so anything after it would have no connection to work with.
-      await flashRadio(await image('radio', rel.radio), (done, total, note) =>
-        at('radio', done, total, note),
-      )
+      await flashRadio(radioImage, (done, total, note) => at('radio', done, total, note))
       at('radio', rel.radio.bytes)
       setJob((r) => (r ? { ...r, phase: 'done', note: VERIFY_DROP_MEANS } : r))
     } catch (e) {
