@@ -35,6 +35,23 @@
       }
     },
     {
+      "version": "2.02",
+      "mod": true,
+      "note": "Everything 2.01 does. Home Assistant no longer drops the connection in the middle of pairing with the PIN on, through an ESPHome Bluetooth proxy.",
+      "stm8": {
+        "file": "stm8-2.02.enc",
+        "bytes": 34816,
+        "sha256": "ec892ae8b35da513ea2221d98485388150d9d3a9ad0abb703018ba3da5b1bf4c",
+        "expect": 202
+      },
+      "radio": {
+        "file": "radio-2.02.bin",
+        "bytes": 28352,
+        "sha256": "541fe4310ae587878c5fe2228ee4808911105cff84113f11bab132a951bc1426",
+        "expect": "5.2"
+      }
+    },
+    {
       "version": "1.05",
       "mod": false,
       "note": "The earliest firmware here. Little reason to choose it except to see what the thermostat originally shipped with.",

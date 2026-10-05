@@ -3,9 +3,10 @@
 Everything a program needs to talk to an eQ-3 CC-RT-BLE thermostat — enough to build a Home
 Assistant integration, a phone app or a script.
 
-This describes **firmware 2.00**, the one in this folder, and eQ-3's own 1.48 alongside it. Every
-command table has a `firmware` column saying which of the two has that command — `stock + 2.00`,
-`2.00 only` or `stock only` — so the same document works whichever a thermostat is running. The
+This describes **this project's firmware, 2.00 and later** (2.02 is the one in this folder), and
+eQ-3's own 1.48 alongside it. Every command table has a `firmware` column saying which of the two has
+that command — `stock + 2.00`, `2.00 only` or `stock only` — so the same document works whichever a
+thermostat is running. Where a later version changed something, the text names that version. The
 thermostat answers `cmd 0x00` with its version, so a client can ask before it assumes.
 
 The thermostat has two processors. A **radio** (Broadcom BCM20736) holds the Bluetooth stack; a
@@ -208,9 +209,13 @@ The encrypted pair above is deliberately *not* gated: the encryption key is what
 a client gets back into a thermostat whose PIN it does not know.
 
 **From 2.01 the thermostat also asks to be paired** when an unpaired client touches a PIN-locked
-characteristic: it refuses the access as before, and then sends Bluetooth's own pairing request.
-Phones and computers start pairing on the refusal anyway; an **ESPHome Bluetooth proxy** does not,
-and pairs only when asked. A client that uses only the encrypted pair never touches a locked
+characteristic, with Bluetooth's own pairing request. **From 2.02** the first write to a locked
+characteristic on a connection gets no answer at once: the thermostat asks to be paired and waits
+up to about three seconds. If pairing finishes in time, a notification switch-on is then accepted; a command is
+always refused, because it was sent before the link was encrypted, so send it again. If pairing does
+not finish in time, the write is refused as before. Other locked accesses are refused at once and
+then followed by the pairing request. Phones, computers and an **ESPHome Bluetooth proxy** all pair
+on that request. A client that uses only the encrypted pair never touches a locked
 characteristic, so it is never asked. On Android the PIN prompt is now preceded by a "pair with
 this device?" confirmation.
 
@@ -338,7 +343,7 @@ than inferring from silence.
 
 | id | firmware | write | what it does |
 |---|---|---|---|
-| `0x00` | stock + 2.00 | `00` | Ask for the version and serial. `200` is this firmware, `148` is eQ-3's last |
+| `0x00` | stock + 2.00 | `00` | Ask for the version and serial. `200` and up is this firmware (`202` = 2.02), `148` is eQ-3's last |
 | `0x41` | stock + 2.00 | `41 <temp×2>` | Set the target temperature, and nothing else. 4.5–30 °C, so `0x09`–`0x3C` |
 | `0x40` | stock + 2.00 | `40 <mode<<6 \| sub>` | Set the mode, and optionally a temperature. See below |
 | `0x43` | stock + 2.00 | `43` | Jump the target to the stored comfort temperature |

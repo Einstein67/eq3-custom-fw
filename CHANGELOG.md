@@ -1,6 +1,16 @@
 # What's new
 
-## 2.01 — this firmware
+## 2.02 — this firmware
+
+Built on 2.01. The radio changes; the thermostat changes only the version number it shows.
+
+- **Home Assistant no longer drops the connection in the middle of pairing** with the pairing PIN on,
+  through an ESPHome Bluetooth proxy. The thermostat now gives pairing a few seconds before it
+  refuses a PIN-locked request.
+
+---
+
+## 2.01
 
 Built on 2.00. Both the radio and the thermostat change.
 
