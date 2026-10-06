@@ -52,15 +52,10 @@ Updating firmware is `flash.py` and nothing else.
 
 ## If Bluetooth stops answering
 
-**Try this first — it needs no tools and no open case.** Take the batteries out, put them back, and
-then hold the **BOOST** button down on the main screen until it reacts. Bluetooth can be switched off
-on the thermostat itself, and a thermostat that is off is not a thermostat that is broken; that
-button is what turns the radio back on. It costs a minute and it is the one cause the wire cannot
-help with any faster.
+**First:** hold **BOOST** on the main screen to enter pairing mode. That turns the radio back on.
 
-If the radio is still silent, it is not lost — it just cannot be reached through the air any more.
-Open the case and put a USB-to-serial adapter on the 5-pin header marked **PRG2**, holding the board
-so that text reads the right way up:
+**If it still does not answer**, reach the radio by wire. Open the case and connect a USB-to-serial
+adapter to the 5-pin header marked **PRG2**. Pin numbers are as seen with that text the right way up:
 
 | PRG2 pin | what it is | connect to |
 |---|---|---|
@@ -70,40 +65,25 @@ so that text reads the right way up:
 | 4 | radio TX | adapter **RX** |
 | 5 | VCC | **nothing** |
 
-115200 baud, 8N1. **Leave pins 1 and 5 unconnected** — the batteries power the board. An ST-Link on
-the SWIM header may stay connected.
+115200 baud, 8N1. The batteries power the board, so leave pins 1 and 5 unconnected. An ST-Link may
+stay connected.
 
 ```sh
-python3 python-scripts/ble_chip_via_uart.py dump -p /dev/ttyUSB0 -o backup.bin
+python3 python-scripts/ble_chip_via_uart.py dump -p /dev/ttyUSB0 -o backup.bin   # optional backup
 python3 python-scripts/ble_chip_via_uart.py recover -p /dev/ttyUSB0
 ```
 
-Nothing needs doing at the thermostat while it connects — no battery pull, no power cycle.
+`recover` installs a rescue radio image. Then **unplug the adapter** (while it is connected the radio
+does not start), take the batteries out and put them back, and install a normal version with
+`flash.py`.
 
-That puts a radio image that answers without pairing into the spare slot and points the chip at it.
-Unplug the adapter, power cycle, close the case, and `flash.py` takes it from there over Bluetooth
-as normal. **Unplug the adapter first**: while it is attached the radio stays in its boot ROM and
-never starts an image. The wire is
-for getting Bluetooth back, not for living on.
-
-Three things the rescue image does that a normal one does not: it **never asks for a pairing PIN**,
-and the thermostat cannot switch one on in it; it advertises **whatever the thermostat last said
-about Bluetooth**, so it comes back even when the radio was switched off; and it advertises **twice a
-second** instead of once, so it is quicker to find and quicker to connect to. All three are there for
-the same reason — this image exists to be reachable, and then to be replaced. Install a real version
-over it with `flash.py` as soon as it answers; that one goes back to respecting the settings, the
-PIN included, and the normal rate.
+The rescue image always advertises, twice a second, and never asks for a PIN. It is only meant to get
+Bluetooth back, so replace it right away.
 
 ## Two chips, one version
 
-A thermostat is two processors: the one that runs the heating, and the radio that carries Bluetooth.
-They have to agree about what they say to each other, so a version means **both** images or neither.
-`flash.py` does both, and there is no option to do one.
-
-It flashes the thermostat first and the radio last, because flashing the radio ends the very
-connection it is being flashed over. Between the two it waits for the thermostat's own bootloader to
-confirm it took the image, and **stops without touching the radio** if it did not. A half-installed
-thermostat leaves you one working chip; carrying on would leave you none.
+A version is two images: the thermostat's and the radio's. `flash.py` always installs both. It does
+the thermostat first, and stops before the radio if the thermostat did not confirm its image.
 
 ## Afterwards
 
